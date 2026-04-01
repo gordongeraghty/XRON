@@ -39,8 +39,8 @@ describe('Substring Application and Expansion', () => {
     const dict: SubstringEntry[] = [{ value: '@example.com', index: 0, frequency: 2 }];
 
     const applied = applySubstringRefs(cells, dict);
-    expect(applied[0][0]).toBe('user1%0');
-    expect(applied[1][0]).toBe('user2%0');
+    expect(applied[0][0]).toBe('user1%0;');
+    expect(applied[1][0]).toBe('user2%0;');
 
     const expanded = expandSubstringRefs(applied, dict);
     expect(expanded[0][0]).toBe('user1@example.com');
@@ -66,7 +66,7 @@ describe('Substring Application and Expansion', () => {
     ];
 
     const applied = applySubstringRefs(cells, dict);
-    // Should match the longer one
-    expect(applied[0][0]).toBe('hello%0');
+    // Should match the longer one (semicolon-terminated ref)
+    expect(applied[0][0]).toBe('hello%0;');
   });
 });

@@ -68,8 +68,8 @@ export function buildSubstringDictionary(
     if (freq < minFrequency) continue;
 
     // Calculate savings: each occurrence saves (sub.length - refLength) chars
-    // refLength is "%N" = 2 chars for single digit, 3 for double digit
-    const refLength = 2 + (candidates.length >= 10 ? 1 : 0);
+    // refLength is "%N;" = 3 chars for single digit, 4 for double digit (semicolon delimiter)
+    const refLength = 3 + (candidates.length >= 10 ? 1 : 0);
     const savingsPerOccurrence = sub.length - refLength;
     if (savingsPerOccurrence <= 0) continue;
 
@@ -146,8 +146,9 @@ export function applySubstringRefs(
       for (const entry of sorted) {
         const idx = escaped.indexOf(entry.value);
         if (idx !== -1) {
-          // Replace the FIRST occurrence only
-          return escaped.slice(0, idx) + '%' + entry.index + escaped.slice(idx + entry.value.length);
+          // Replace the FIRST occurrence only — use %N; format (semicolon-terminated)
+          // to prevent ambiguity when the next character after the ref is a digit
+          return escaped.slice(0, idx) + '%' + entry.index + ';' + escaped.slice(idx + entry.value.length);
         }
       }
 
@@ -181,8 +182,8 @@ export function expandSubstringRefs(
       const sentinel = '\x00PCNT\x00';
       let result = cell.replace(/%%/g, sentinel);
 
-      // Step 2: Expand %N references
-      result = result.replace(/%(\d+)/g, (match, indexStr) => {
+      // Step 2: Expand %N; references (semicolon-terminated)
+      result = result.replace(/%(\d+);/g, (match, indexStr) => {
         const index = parseInt(indexStr, 10);
         return lookup.get(index) ?? match; // Keep original if not found
       });

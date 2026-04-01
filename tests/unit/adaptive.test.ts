@@ -18,7 +18,7 @@ const LARGE_UNIFORM = Array.from({ length: 50 }, (_, i) => ({
 
 const LARGE_NO_REPEAT = Array.from({ length: 20 }, (_, i) => ({
   id: i,
-  label: `unique-value-${i}-xyz-${Math.random().toString(36).slice(2)}`,
+  label: `unique-value-${i}-xyz-${String(i * 97 + 31).padStart(6, '0')}`,
   code: `CODE-${i * 7 + 13}-${i * 3}`,
 }));
 
