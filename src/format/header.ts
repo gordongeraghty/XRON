@@ -28,9 +28,10 @@ export function formatSchemaHeader(
 ): string {
   const name = level >= 2 ? schema.name : schema.fullName;
   const fields = schema.fields.map((f, i) => {
-    if (level >= 2 && schema.fieldTypes.get(i) === 'boolean') {
-      return `${f}?b`;
-    }
+    const type = schema.fieldTypes.get(i);
+    if (type === 'boolean') return `${f}?b`;
+    if (type === 'date') return `${f}?d`;
+    if (type === 'bigint') return `${f}?i`;
     return f;
   }).join(', ');
   return `@S ${name}: ${fields}`;
@@ -89,13 +90,15 @@ export function parseSchemaHeader(
   const fieldTypes = new Map<number, string>();
 
   for (let i = 0; i < rawFields.length; i++) {
-    const typeMatch = rawFields[i].match(/^(\w+)\?([bns])$/);
+    const typeMatch = rawFields[i].match(/^(\w+)\?([bnsdi])$/);
     if (typeMatch) {
       fields.push(typeMatch[1]);
       const typeChar = typeMatch[2];
       if (typeChar === 'b') fieldTypes.set(i, 'boolean');
       else if (typeChar === 'n') fieldTypes.set(i, 'number');
       else if (typeChar === 's') fieldTypes.set(i, 'string');
+      else if (typeChar === 'd') fieldTypes.set(i, 'date');
+      else if (typeChar === 'i') fieldTypes.set(i, 'bigint');
     } else {
       fields.push(rawFields[i]);
     }

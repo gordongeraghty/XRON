@@ -51,6 +51,36 @@ function analyzeNumericColumn(
 ): DeltaColumnInfo | null {
   if (values.length < 2) return null;
 
+  const hasBigInt = values.some(v => typeof v === 'bigint');
+
+  if (hasBigInt) {
+    // Mixed safety: promote all numeric values to BigInt
+    if (!values.every(v => typeof v === 'bigint' || (typeof v === 'number' && isFinite(v)))) return null;
+
+    const bigValues: bigint[] = values.map(v => BigInt(v as number | bigint));
+    const deltas: bigint[] = [];
+    for (let i = 1; i < bigValues.length; i++) {
+      deltas.push(bigValues[i] - bigValues[i - 1]);
+    }
+
+    const isConstant = deltas.every(d => d === deltas[0]);
+
+    const avgAbsValue = bigValues.reduce((sum, v) => sum + (v < 0n ? -v : v), 0n) / BigInt(bigValues.length);
+    const avgAbsDelta = deltas.reduce((sum, d) => sum + (d < 0n ? -d : d), 0n) / BigInt(deltas.length);
+
+    if (!isConstant && avgAbsDelta >= avgAbsValue / 2n) {
+      return null;
+    }
+
+    return {
+      columnIndex,
+      type: 'numeric',
+      isConstant,
+      constantDelta: isConstant ? deltas[0] : null,
+      isBigInt: true,
+    };
+  }
+
   // All values must be numbers
   if (!values.every(v => typeof v === 'number' && isFinite(v))) return null;
 
@@ -94,21 +124,23 @@ export function applyDeltaEncoding(
   if (rows.length === 0 || deltaColumns.length === 0) return rows;
 
   const result: string[][] = rows.map(row => [...row]);
-  const deltaColSet = new Set(deltaColumns.map(d => d.columnIndex));
 
   for (const deltaInfo of deltaColumns) {
     const col = deltaInfo.columnIndex;
 
     for (let row = 1; row < result.length; row++) {
-      const currentVal = parseFloat(rows[row][col]);
-      const prevVal = parseFloat(rows[row - 1][col]);
-
-      if (!isNaN(currentVal) && !isNaN(prevVal)) {
+      if (deltaInfo.isBigInt) {
+        const currentVal = BigInt(rows[row][col]);
+        const prevVal = BigInt(rows[row - 1][col]);
         const delta = currentVal - prevVal;
-        if (delta >= 0) {
-          result[row][col] = `+${delta}`;
-        } else {
-          result[row][col] = `${delta}`; // negative already has -
+        result[row][col] = delta >= 0n ? `+${delta}` : `${delta}`;
+      } else {
+        const currentVal = parseFloat(rows[row][col]);
+        const prevVal = parseFloat(rows[row - 1][col]);
+
+        if (!isNaN(currentVal) && !isNaN(prevVal)) {
+          const delta = currentVal - prevVal;
+          result[row][col] = delta >= 0 ? `+${delta}` : `${delta}`;
         }
       }
     }
@@ -152,22 +184,39 @@ export function applyRepeatEncoding(
 export function decodeDeltaRows(
   rows: string[][],
   deltaColumns: Set<number>,
+  bigintColumns?: Set<number>,
 ): string[][] {
   if (rows.length === 0) return rows;
 
   const result: string[][] = rows.map(row => [...row]);
 
   for (const col of deltaColumns) {
-    let currentValue = parseFloat(result[0][col]);
+    const isBigInt = bigintColumns?.has(col) ?? false;
 
-    for (let row = 1; row < result.length; row++) {
-      const raw = result[row][col];
-      if (raw.startsWith('+') || (raw.startsWith('-') && raw.length > 1)) {
-        const delta = parseFloat(raw);
-        currentValue = currentValue + delta;
-        result[row][col] = String(currentValue);
-      } else {
-        currentValue = parseFloat(raw);
+    if (isBigInt) {
+      let currentValue = BigInt(result[0][col]);
+
+      for (let row = 1; row < result.length; row++) {
+        const raw = result[row][col];
+        if (raw.startsWith('+') || (raw.startsWith('-') && raw.length > 1)) {
+          currentValue = currentValue + BigInt(raw);
+          result[row][col] = String(currentValue);
+        } else {
+          currentValue = BigInt(raw);
+        }
+      }
+    } else {
+      let currentValue = parseFloat(result[0][col]);
+
+      for (let row = 1; row < result.length; row++) {
+        const raw = result[row][col];
+        if (raw.startsWith('+') || (raw.startsWith('-') && raw.length > 1)) {
+          const delta = parseFloat(raw);
+          currentValue = currentValue + delta;
+          result[row][col] = String(currentValue);
+        } else {
+          currentValue = parseFloat(raw);
+        }
       }
     }
   }

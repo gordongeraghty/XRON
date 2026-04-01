@@ -28,10 +28,10 @@ export function extractSchemas(data: any): Map<string, SchemaDefinition> {
   // Phase 1: DFS to discover all object shapes and their frequencies
   collectShapes(data, shapeMap, '');
 
-  // Phase 2: Filter — only shapes with 2+ properties appearing 2+ times
+  // Phase 2: Filter — only shapes with 1+ properties appearing 2+ times
   const qualifying = new Map<string, ShapeInfo>();
   for (const [sig, info] of shapeMap) {
-    if (info.keys.length >= 2 && info.frequency >= 2) {
+    if (info.keys.length >= 1 && info.frequency >= 2) {
       qualifying.set(sig, info);
     }
   }
@@ -93,7 +93,7 @@ function collectShapes(
   }
 
   const keys = Object.keys(value);
-  if (keys.length >= 2) {
+  if (keys.length >= 1) {
     const signature = keys.slice().sort().join(',');
     const existing = shapes.get(signature);
     if (existing) {
@@ -134,6 +134,10 @@ function detectFieldTypes(
         const val = instance[fieldName];
         if (val === null || val === undefined) {
           types.add('null');
+        } else if (val instanceof Date) {
+          types.add('date');
+        } else if (typeof val === 'bigint') {
+          types.add('bigint');
         } else {
           types.add(typeof val);
         }
@@ -145,9 +149,14 @@ function detectFieldTypes(
         else if (t === 'number') schema.fieldTypes.set(fieldIdx, 'number');
         else if (t === 'string') schema.fieldTypes.set(fieldIdx, 'string');
         else if (t === 'null') schema.fieldTypes.set(fieldIdx, 'null');
+        else if (t === 'date') schema.fieldTypes.set(fieldIdx, 'date');
+        else if (t === 'bigint') schema.fieldTypes.set(fieldIdx, 'bigint');
       } else if (types.has('boolean') && types.size <= 2) {
         // boolean + null → still boolean
         schema.fieldTypes.set(fieldIdx, 'boolean');
+      } else if (types.has('bigint') && !types.has('string') && !types.has('boolean') && !types.has('date')) {
+        // bigint (+ null or + number) → promote to bigint
+        schema.fieldTypes.set(fieldIdx, 'bigint');
       } else {
         schema.fieldTypes.set(fieldIdx, 'mixed');
       }
@@ -216,7 +225,7 @@ function resolveNestedSchemas(
         const fieldValue = instance[fieldName];
         if (fieldValue !== null && typeof fieldValue === 'object' && !Array.isArray(fieldValue)) {
           const nestedKeys = Object.keys(fieldValue);
-          if (nestedKeys.length >= 2) {
+          if (nestedKeys.length >= 1) {
             const nestedSig = nestedKeys.slice().sort().join(',');
             const nestedSchemaName = sigToSchema.get(nestedSig);
             if (nestedSchemaName) {
@@ -268,7 +277,7 @@ function collectInstances(value: any, signature: string, results: any[]): void {
 
   if (typeof value === 'object') {
     const keys = Object.keys(value);
-    if (keys.length >= 2) {
+    if (keys.length >= 1) {
       const sig = keys.slice().sort().join(',');
       if (sig === signature) {
         results.push(value);
@@ -289,7 +298,7 @@ export function matchSchema(
   schemas: Map<string, SchemaDefinition>,
 ): SchemaDefinition | null {
   const keys = Object.keys(obj);
-  if (keys.length < 2) return null;
+  if (keys.length < 1) return null;
   const signature = keys.slice().sort().join(',');
   return schemas.get(signature) ?? null;
 }

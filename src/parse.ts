@@ -9,6 +9,8 @@ import {
   XronLevel,
   SchemaDefinition,
   XronDocument,
+  XronOptions,
+  DEFAULT_OPTIONS,
 } from './types.js';
 import {
   parseVersionHeader,
@@ -20,7 +22,7 @@ import {
   isHeaderLine,
   getHeaderType,
 } from './format/header.js';
-import { decodeTypedValue } from './pipeline/type-encoding.js';
+import { decodeTypedValue, expandDate } from './pipeline/type-encoding.js';
 import { resolveDictRef, isDictRef } from './pipeline/dictionary.js';
 import { decodeDeltaRows, decodeRepeatRows } from './pipeline/delta.js';
 import { splitRow, findSchemaByName } from './pipeline/positional.js';
@@ -30,9 +32,23 @@ import { SubstringEntry, expandSubstringRefs } from './pipeline/substring-dict.j
 /**
  * Parse an XRON string back to a JavaScript value.
  */
-export function parse(input: string): any {
+export function parse(input: string, options?: XronOptions): any {
   if (typeof input !== 'string') {
     throw new TypeError('XRON.parse expects a string input');
+  }
+
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+
+  // Preliminary brace scan to avoid call stack limits later
+  let currentDepth = 0;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '{' || ch === '[' || ch === '(') {
+      currentDepth++;
+      if (currentDepth > opts.maxDepth) throw new TypeError('Maximum parsing depth exceeded');
+    } else if (ch === '}' || ch === ']' || ch === ')') {
+      currentDepth--;
+    }
   }
 
   const trimmed = input.trim();
@@ -42,7 +58,12 @@ export function parse(input: string): any {
   if (trimmed === 'null' || trimmed === '-') return null;
   if (trimmed === 'true') return true;
   if (trimmed === 'false') return false;
-  if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(trimmed)) return Number(trimmed);
+  if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(trimmed)) {
+    if (!trimmed.includes('.') && (trimmed.length > 15 || !Number.isSafeInteger(Number(trimmed)))) {
+      return BigInt(trimmed);
+    }
+    return Number(trimmed);
+  }
 
   // Check if this is XRON format (starts with @v header)
   if (!trimmed.startsWith('@v')) {
@@ -120,7 +141,7 @@ function parseDocument(input: string): XronDocument {
             signature: s.fields.slice().sort().join(','),
             frequency: 0,
             nestedSchemas: new Map(),
-            fieldTypes: s.fieldTypes as Map<number, 'boolean' | 'number' | 'string' | 'null' | 'mixed'>,
+            fieldTypes: s.fieldTypes as Map<number, 'boolean' | 'number' | 'string' | 'null' | 'date' | 'mixed' | 'bigint'>,
           };
           schemas.set(schema.signature, schema);
           schemasByName.set(s.name, schema);
@@ -291,7 +312,12 @@ function decodeSchemaRows(
     }
 
     if (deltaColumns.size > 0) {
-      cells = decodeDeltaRows(cells, deltaColumns);
+      // Pass bigint column indices so delta decode uses BigInt arithmetic
+      const bigintColumns = new Set<number>();
+      for (let col = 0; col < schema.fields.length; col++) {
+        if (schema.fieldTypes.get(col) === 'bigint') bigintColumns.add(col);
+      }
+      cells = decodeDeltaRows(cells, deltaColumns, bigintColumns.size > 0 ? bigintColumns : undefined);
     }
   }
 
@@ -328,6 +354,13 @@ function decodeSchemaRows(
         }
       }
 
+      // BigInt: intercept before type-decoding to preserve full precision
+      const fieldType = schema.fieldTypes.get(i);
+      if (fieldType === 'bigint') {
+        obj[field] = (raw === '' || raw === '-' || raw === 'null') ? null : BigInt(raw);
+        continue;
+      }
+
       // Check for inline array [val, val, ...] or object {key: val, ...}
       let decoded: any;
       if (raw.startsWith('[') && raw.endsWith(']')) {
@@ -339,9 +372,10 @@ function decodeSchemaRows(
       }
 
       // Apply field type hints for lossless boolean round-tripping
-      const fieldType = schema.fieldTypes.get(i);
       if (fieldType === 'boolean' && typeof decoded === 'number') {
         decoded = decoded !== 0;
+      } else if (fieldType === 'date' && typeof decoded === 'string') {
+        decoded = new Date(expandDate(decoded));
       }
 
       obj[field] = decoded;
@@ -382,6 +416,13 @@ function decodeSchemaInstance(
       }
     }
 
+    // BigInt: intercept before type-decoding to preserve full precision
+    const fieldType = schema.fieldTypes.get(i);
+    if (fieldType === 'bigint') {
+      obj[field] = (raw === '' || raw === '-' || raw === 'null') ? null : BigInt(raw);
+      continue;
+    }
+
     // Check for inline array/object
     let decoded: any;
     if (raw.startsWith('[') && raw.endsWith(']')) {
@@ -393,9 +434,10 @@ function decodeSchemaInstance(
     }
 
     // Apply field type hints for lossless boolean round-tripping
-    const fieldType = schema.fieldTypes.get(i);
     if (fieldType === 'boolean' && typeof decoded === 'number') {
       decoded = decoded !== 0;
+    } else if (fieldType === 'date' && typeof decoded === 'string') {
+      decoded = new Date(expandDate(decoded));
     }
 
     obj[field] = decoded;
@@ -656,3 +698,18 @@ function splitKeyValue(str: string): [string, string] {
 }
 
 import { unescapeValue } from './format/escape.js';
+
+export async function* parseStream(input: AsyncIterable<string> | any, options?: XronOptions): AsyncIterable<any> {
+    let fullInput = '';
+    for await (const chunk of input) {
+        fullInput += chunk;
+    }
+    const result = parse(fullInput, options);
+    if (Array.isArray(result)) {
+        for (const item of result) {
+            yield item;
+        }
+    } else {
+        yield result;
+    }
+}

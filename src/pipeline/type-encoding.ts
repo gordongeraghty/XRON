@@ -59,9 +59,9 @@ export function encodeTypedValue(value: any, level: XronLevel): string {
     return escapeValue(value);
   }
 
-  // BigInt — not supported
+  // BigInt — serialize as string (schema hint handles restoration)
   if (typeof value === 'bigint') {
-    throw new TypeError('BigInt values are not supported in XRON');
+    return String(value);
   }
 
   // Fallback: stringify
@@ -94,8 +94,11 @@ export function decodeTypedValue(raw: string, level: XronLevel): any {
     return unescapeQuoted(raw);
   }
 
-  // Number
+  // Number or BigInt
   if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(raw)) {
+    if (!raw.includes('.') && (raw.length > 15 || !Number.isSafeInteger(Number(raw)))) {
+      return BigInt(raw);
+    }
     return Number(raw);
   }
 

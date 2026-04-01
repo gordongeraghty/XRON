@@ -17,7 +17,7 @@ import { assessData } from './pipeline/adaptive.js';
 import { extractSchemas, matchSchema } from './pipeline/schema.js';
 import { encodePositionalRows, splitRow } from './pipeline/positional.js';
 import { buildDictionary, createDictLookup } from './pipeline/dictionary.js';
-import { encodeTypedValue } from './pipeline/type-encoding.js';
+import { encodeTypedValue, compactDate } from './pipeline/type-encoding.js';
 import {
   analyzeDeltaColumns,
   applyDeltaEncoding,
@@ -47,14 +47,15 @@ import {
 /**
  * Pre-check for circular references before any processing.
  */
-function checkCircular(value: any, seen: WeakSet<object>): void {
+function checkCircular(value: any, seen: WeakSet<object>, depth: number, maxDepth: number): void {
+  if (depth > maxDepth) throw new TypeError('Maximum serialization depth exceeded');
   if (value === null || value === undefined || typeof value !== 'object') return;
   if (seen.has(value)) throw new TypeError('Circular reference detected');
   seen.add(value);
   if (Array.isArray(value)) {
-    for (const item of value) checkCircular(item, seen);
+    for (const item of value) checkCircular(item, seen, depth + 1, maxDepth);
   } else {
-    for (const key of Object.keys(value)) checkCircular(value[key], seen);
+    for (const key of Object.keys(value)) checkCircular(value[key], seen, depth + 1, maxDepth);
   }
   seen.delete(value);
 }
@@ -110,11 +111,12 @@ export function stringify(value: any, options?: XronOptions): string {
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (typeof value === 'number') return String(value);
   if (typeof value === 'string') return escapeValue(value);
-  if (typeof value === 'bigint') throw new TypeError('BigInt values are not supported in XRON');
+  if (value instanceof Date) return escapeValue(compactDate(value.toISOString()));
+  if (typeof value === 'bigint') return String(value);
 
   // Detect circular references early
   const seen = new WeakSet();
-  checkCircular(value, new WeakSet());
+  checkCircular(value, new WeakSet(), 0, opts.maxDepth);
 
   // Extract schemas from the data
   const schemas = extractSchemas(value);
@@ -172,6 +174,10 @@ function encodeData(
 
   if (typeof value !== 'object') {
     return [encodePrimitive(value, level, dictLookup)];
+  }
+
+  if (value instanceof Date) {
+    return [encodePrimitive(compactDate(value.toISOString()), level, dictLookup)];
   }
 
   // Circular reference detection
@@ -299,8 +305,7 @@ function encodeSchemaArray(
       const rawRows = arr.map(item =>
         schema.fields.map(f => item[f])
       );
-      const deltaColumns = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold)
-        .filter(dc => !templateColumns.has(dc.columnIndex));
+      const deltaColumns = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold);
 
       // Apply delta encoding
       let processed = applyDeltaEncoding(parsed2D, deltaColumns);
@@ -390,6 +395,7 @@ function encodeInlineValue(
   // Always use true/false for booleans in inline encoding — no type-hint available on decode.
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (typeof value !== 'object') return encodePrimitive(value, level, dictLookup);
+  if (value instanceof Date) return encodePrimitive(compactDate(value.toISOString()), level, dictLookup);
 
   if (seen.has(value)) throw new TypeError('Circular reference detected');
   seen.add(value);
@@ -409,5 +415,13 @@ function encodeInlineValue(
     return `{${pairs.join(', ')}}`;
   } finally {
     seen.delete(value);
+  }
+}
+
+export async function* stringifyStream(value: any, options?: XronOptions): AsyncIterable<string> {
+  const result = stringify(value, options);
+  const lines = result.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    yield lines[i] + (i < lines.length - 1 ? '\n' : '');
   }
 }

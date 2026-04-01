@@ -38,8 +38,8 @@
  * @module xron-format
  */
 
-import { stringify } from './stringify.js';
-import { parse } from './parse.js';
+import { stringify, stringifyStream } from './stringify.js';
+import { parse, parseStream } from './parse.js';
 import {
   XronOptions,
   XronLevel,
@@ -156,6 +156,8 @@ export const XRON = {
   stringify,
   /** Parse an XRON string back to its original JavaScript value (lossless). */
   parse,
+  stringifyStream,
+  parseStream,
   /** Async: measure actual token counts at every level and return metrics. */
   analyze,
   /**
@@ -166,7 +168,7 @@ export const XRON = {
 };
 
 // Named exports for tree-shaking
-export { stringify, parse, analyze, recommend };
+export { stringify, parse, analyze, recommend, stringifyStream, parseStream };
 
 // Type re-exports
 export type {

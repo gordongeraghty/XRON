@@ -52,6 +52,11 @@ export interface XronOptions {
    * Recommended: `150` for typical LLM prompt assembly use cases.
    */
   minCompressSize?: number;
+  /**
+   * Maximum structural depth for arrays and objects to prevent stack overflow.
+   * Default: `64`
+   */
+  maxDepth?: number;
 }
 
 /** Analysis result showing compression metrics */
@@ -91,7 +96,7 @@ export interface SchemaDefinition {
   /** Nested schema references (field index → schema name) */
   nestedSchemas: Map<number, string>;
   /** Field type hints (field index → detected type) for lossless round-tripping */
-  fieldTypes: Map<number, 'boolean' | 'number' | 'string' | 'null' | 'mixed'>;
+  fieldTypes: Map<number, 'boolean' | 'number' | 'string' | 'null' | 'date' | 'mixed' | 'bigint'>;
 }
 
 /** Internal dictionary entry */
@@ -115,7 +120,9 @@ export interface DeltaColumnInfo {
   /** Whether all deltas are constant */
   isConstant: boolean;
   /** The constant delta value (if isConstant) */
-  constantDelta: number | null;
+  constantDelta: number | bigint | null;
+  /** Whether the column contains BigInt values */
+  isBigInt?: boolean;
 }
 
 /** Token types for the XRON lexer */
@@ -179,4 +186,5 @@ export const DEFAULT_OPTIONS: Required<XronOptions> = {
   minDictValueLength: 2,
   minDictFrequency: 2,
   minCompressSize: 0,
+  maxDepth: 64,
 };
