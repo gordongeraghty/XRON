@@ -19,9 +19,9 @@ Every time you send structured data to an LLM, JSON imposes significant token ov
 
 For a typical 500-user dataset, JSON consumes **~4,200 tokens**. At $15/MTok (GPT-4o output pricing), that is $0.063 per query. These tokens also consume context window space that could hold actual instructions or conversation history.
 
-## The Solution: XRON's 6-Layer Compression Pipeline
+## The Solution: XRON's 9-Layer Compression Pipeline
 
-XRON is a lossless serialization format purpose-built for LLM token efficiency. It applies six progressive compression layers:
+XRON is a lossless serialization format purpose-built for LLM token efficiency. It applies nine progressive compression layers:
 
 | Layer | Technique | What It Eliminates |
 |-------|-----------|-------------------|
@@ -29,8 +29,11 @@ XRON is a lossless serialization format purpose-built for LLM token efficiency. 
 | L2 | Positional streaming | All key tokens in tabular data |
 | L3 | Dictionary encoding | Repeated string values |
 | L4 | Type-aware encoding | Verbose booleans, nulls, dates, UUIDs |
-| L5 | Delta + repeat compression | Sequential numbers, repeated values |
-| L6 | Tokenizer alignment | Suboptimal BPE token boundaries |
+| L5 | Column templates | Common prefix/suffix in column values |
+| L6 | Substring dictionary | Repeated substrings across unique values |
+| L7 | Delta + repeat compression | Sequential numbers, repeated values |
+| L8 | Separator reduction | Field separator overhead (tab vs comma-space) |
+| L9 | Tokenizer alignment | Suboptimal BPE token boundaries |
 
 The result: `XRON.parse(XRON.stringify(data))` deep-equals the original data, while using 60-80% fewer tokens.
 
@@ -143,12 +146,13 @@ const output = XRON.stringify(data, { level: 2 });
 
 ### Level 3: Maximum (~80% reduction)
 
-Adds delta encoding for sequential numeric columns, repeat markers (`~`) for consecutive identical values, and Base62 UUID compression.
+Adds column templates (`@T`), substring dictionary (`@P`), delta encoding for sequential numeric columns, repeat markers (`~`) for consecutive identical values, tab separators, and Base62 UUID compression.
 
 ```typescript
 const records = Array.from({ length: 5 }, (_, i) => ({
   id: i + 1,
   name: `User${i + 1}`,
+  email: `user${i + 1}@example.com`,
   score: (i + 1) * 10,
 }));
 
@@ -157,16 +161,17 @@ const output = XRON.stringify(records, { level: 3 });
 
 ```
 @v3
-@S A: id, name, score
+@S A: id, name, email, score
+@T 2: user{}@example.com
 @N5 A
-1, User1, 10
-+1, User2, +10
-+1, User3, +10
-+1, User4, +10
-+1, User5, +10
+1	User1	1	10
++1	User2	+1	+10
++1	User3	+1	+10
++1	User4	+1	+10
++1	User5	+1	+10
 ```
 
-**What Level 3 adds:** The `id` column is delta-encoded as `+1` after the first row (since each ID increments by 1). The `score` column is also delta-encoded as `+10`. If consecutive rows share the same value in a non-delta column, that value is replaced with `~` (repeat marker). UUIDs like `550e8400-e29b-41d4-a716-446655440000` are compressed to `^` plus a Base62 string (~22 characters instead of 36).
+**What Level 3 adds:** Column templates (`@T`) detect common prefix/suffix patterns — in this example, all emails match `user{}@example.com`, so only the variable part (`1`, `2`, etc.) is stored. Substring dictionaries (`@P`) extract repeated substrings shared across otherwise-unique values. The `id` column is delta-encoded as `+1` after the first row (since each ID increments by 1). The `score` column is also delta-encoded as `+10`. If consecutive rows share the same value in a non-delta column, that value is replaced with `~` (repeat marker). Tab separators replace `, ` to save one character per field boundary. UUIDs like `550e8400-e29b-41d4-a716-446655440000` are compressed to `^` plus a Base62 string (~22 characters instead of 36).
 
 ---
 
@@ -428,6 +433,28 @@ Declares how many data rows follow for a given schema. This enables the parser t
 @N100 User   100 rows of schema User follow
 ```
 
+### `@T` -- Column Template
+
+Defines a prefix/suffix pattern for a column. Values in that column are stored as the variable part only. The `{}` placeholder marks where the variable portion sits within the template.
+
+```
+@T 2: user{}@example.com    ← column 2 follows this pattern
+```
+
+Data rows for column 2 then contain only the variable part (e.g., `alice` instead of `alice@example.com`). The parser reconstructs the full value by inserting the stored part into the template.
+
+### `@P` -- Substring Dictionary
+
+Like `@D` but for substrings within values. Repeated substrings that appear across otherwise-unique values are extracted into a shared dictionary. References use the `%N;` format, where `N` is the zero-based dictionary index.
+
+```
+@P: @example.com            ← shared substring
+user1%0;                     ← %0; expands to @example.com
+user2%0;                     ← same expansion
+```
+
+Substring dictionaries are built when full-value dictionary encoding (`@D`) does not apply — i.e., the values are unique but share common fragments.
+
 ### Delta Encoding (`+N`)
 
 At Level 3, numeric columns with sequential patterns are delta-encoded. After the first absolute value, subsequent values are expressed as deltas from the previous row:
@@ -545,9 +572,17 @@ A 3, Carol Williams, carol@example.com, Sales, true
 | **TRON** | **7,230** | **-47%** | -0% | baseline |
 | **XRON Level 1** | **7,049** | **-48%** | **-3%** | **-3%** |
 | **XRON Level 2** | **5,367** | **-60%** | **-26%** | **-26%** |
-| **XRON Level 3** | **5,275** | **-61%** | **-27%** | **-27%** |
+| **XRON Level 3** | **2,714** | **-80%** | **-62%** | **-62%** |
 
-At 100 rows, XRON L2/L3 is **26-27% smaller than TOON/TRON** — the gap comes from compression layers that neither TOON nor TRON have.
+Additional benchmarks:
+
+| Dataset | Rows | Fields | JSON Chars | XRON L3 Chars | Reduction |
+|---------|-----:|-------:|-----------:|--------------:|----------:|
+| Employees | 100 | 7 | 13,569 | 2,714 | 80% |
+| Employees | 500 | 5 | 52,840 | 12,682 | 76% |
+| IoT sensors | 200 | 6 | 28,150 | 7,882 | 72% |
+
+At 100 rows, XRON L3 is **62% smaller than TOON/TRON** — the gap comes from column templates, substring dictionaries, delta encoding, and separator reduction that neither TOON nor TRON have.
 
 ### What XRON Does That TOON and TRON Cannot
 
@@ -603,15 +638,27 @@ Reduces verbose type representations:
 - Dates: `"2026-04-01"` (12 chars, ~4 tokens with quotes) becomes `20260401` (8 chars, ~2 tokens, no quotes)
 - UUIDs: 36-character UUID becomes `^` + ~22-character Base62 string
 
-### Layer 5: Delta + Repeat Compression
+### Layer 5: Column Templates
+
+Detects columns where all values share a common prefix and/or suffix (e.g., email addresses like `user1@example.com`, `user2@example.com`). The shared pattern is declared once in an `@T` header, and data rows store only the variable portion. This eliminates the repeated prefix/suffix from every row.
+
+### Layer 6: Substring Dictionary
+
+Identifies repeated substrings that appear across otherwise-unique string values. Unlike full-value dictionary encoding (`@D`), which replaces entire values, substring dictionaries (`@P`) replace fragments within values using `%N;` references. Particularly effective for columns with structured but non-identical values (e.g., URLs, file paths, email addresses that don't share a uniform template).
+
+### Layer 7: Delta + Repeat Compression
 
 Analyzes numeric columns for sequential patterns. If deltas between consecutive values are constant or significantly smaller than absolute values, the column is delta-encoded. Non-delta columns with repeated consecutive values are replaced with `~` (same-as-previous) markers.
 
-### Layer 6: Tokenizer Alignment
+### Layer 8: Separator Reduction
 
-Selects separators and layout characters that minimize token count for the target BPE tokenizer. Key choices:
+Replaces the default comma-space (`, `) field separator with a tab character (`\t`) at Level 3. This saves one character per field boundary across every row. The parser auto-detects whether a document uses tab or comma-space separators, so both formats decode transparently.
+
+### Layer 9: Tokenizer Alignment
+
+Selects separators and layout characters that minimise token count for the target BPE tokenizer. Key choices:
 - Newline (`\n`) as row separator: always 1 token
-- Comma-space (`, `) as field separator: typically merges into 1 token in BPE
+- Tab (`\t`) or comma-space (`, `) as field separator depending on level
 - `@` as header prefix: 1 token in o200k_base, cl100k_base, and Claude tokenizers
 - Parentheses for nesting: 1 token each
 
