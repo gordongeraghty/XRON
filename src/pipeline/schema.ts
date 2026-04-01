@@ -28,10 +28,10 @@ export function extractSchemas(data: any): Map<string, SchemaDefinition> {
   // Phase 1: DFS to discover all object shapes and their frequencies
   collectShapes(data, shapeMap, '');
 
-  // Phase 2: Filter — only shapes with 1+ properties appearing 2+ times
+  // Phase 2: Filter — only shapes with 2+ properties appearing 2+ times
   const qualifying = new Map<string, ShapeInfo>();
   for (const [sig, info] of shapeMap) {
-    if (info.keys.length >= 1 && info.frequency >= 2) {
+    if (info.keys.length >= 2 && info.frequency >= 2) {
       qualifying.set(sig, info);
     }
   }
@@ -93,7 +93,7 @@ function collectShapes(
   }
 
   const keys = Object.keys(value);
-  if (keys.length >= 1) {
+  if (keys.length >= 2) {
     const signature = keys.slice().sort().join(',');
     const existing = shapes.get(signature);
     if (existing) {

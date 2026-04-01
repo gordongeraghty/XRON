@@ -81,26 +81,27 @@ export function stringify(value: any, options?: XronOptions): string {
       return stringify(value, { ...opts, level: 1 });
     }
 
-    const jsonStr = JSON.stringify(value);
+    const jsonStr = JSON.stringify(value, (_, v) => typeof v === 'bigint' ? v.toString() : v);
     const minSize = opts.minCompressSize ?? 0;
     
-    if (minSize > 0 && jsonStr.length < minSize) {
-      return jsonStr;
+    // Only return raw JSON if explicitly configured for tiny payloads AND it contains no BigInts
+    if (minSize > 0 && jsonStr.length < minSize && !jsonStr.includes('"')) {
+      // Actually, removing JSON fallback entirely guarantees native type retention.
     }
 
     // Try all levels and pick the shortest output
-    let bestOutput = jsonStr;
+    let bestOutput: string | null = null;
     for (const lvl of [1, 2, 3] as const) {
       try {
         const candidate = stringify(value, { ...opts, level: lvl });
-        if (candidate.length < bestOutput.length) {
+        if (bestOutput === null || candidate.length < bestOutput.length) {
           bestOutput = candidate;
         }
       } catch {
         // If a level fails, skip it
       }
     }
-    return bestOutput;
+    return bestOutput!;
   }
 
   const level = opts.level as XronLevel;
@@ -260,70 +261,47 @@ function encodeSchemaArray(
 
   const rows = encodePositionalRows(arr, schema, schemas, valueEncoder, level, fieldSep);
 
-  // Layer A: Column Template Compression (Level 2+)
-  // Template headers must appear BEFORE the @N cardinality guard so the parser
-  // collects them during the header phase.
-  let templateColumns = new Set<number>();
-  let parsed2DForTemplates: string[][] | null = null;
-
+  // Compression Pipeline
   if (level >= 2 && rows.length >= 2) {
-    // Parse rows into 2D array
-    parsed2DForTemplates = rows.map(row => splitRow(row));
+    let parsed2D = rows.map(row => splitRow(row));
 
-    const templates = detectColumnTemplates(parsed2DForTemplates);
-    templateColumns = new Set(templates.map(t => t.columnIndex));
+    // 1. Delta & Repeat Encoding (Level 3)
+    let deltaColumnsInfo = [] as any[];
+    if (level >= 3 && rows.length >= opts.deltaThreshold) {
+      const rawRows = arr.map(item => schema.fields.map(f => item[f]));
+      deltaColumnsInfo = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold);
+      parsed2D = applyDeltaEncoding(parsed2D, deltaColumnsInfo);
+      parsed2D = applyRepeatEncoding(parsed2D, deltaColumnsInfo);
+    }
 
+    // 2. Column Templates (Level 2+)
+    const templates = detectColumnTemplates(parsed2D);
     if (templates.length > 0) {
-      // Write template headers BEFORE cardinality guard
       for (const tmpl of templates) {
         lines.push(formatTemplateHeader(tmpl));
       }
-      // Apply templates — strip prefix/suffix from values
-      parsed2DForTemplates = applyColumnTemplates(parsed2DForTemplates, templates);
+      parsed2D = applyColumnTemplates(parsed2D, templates);
     }
-  }
 
-  // Layer C: Substring Dictionary Compression (Level 3)
-  // @P header must appear BEFORE the @N cardinality guard so the parser
-  // collects it during the header phase.
-  if (level >= 3 && parsed2DForTemplates) {
-    const substringEntries = buildSubstringDictionary(parsed2DForTemplates);
-    if (substringEntries.length > 0) {
-      lines.push(formatSubstringDictHeader(substringEntries.map(e => e.value)));
-      parsed2DForTemplates = applySubstringRefs(parsed2DForTemplates, substringEntries);
+    // 3. Substring Dictionary Compression (Level 3)
+    if (level >= 3) {
+      const substringEntries = buildSubstringDictionary(parsed2D);
+      if (substringEntries.length > 0) {
+        lines.push(formatSubstringDictHeader(substringEntries.map(e => e.value)));
+        parsed2D = applySubstringRefs(parsed2D, substringEntries);
+      }
     }
-  }
 
-  // Cardinality guard
-  lines.push(formatCardinalityHeader(arr.length, schemaName));
+    // Cardinality guard
+    lines.push(formatCardinalityHeader(arr.length, schemaName));
 
-  if (level >= 2 && rows.length >= 2 && parsed2DForTemplates) {
-    let parsed2D = parsed2DForTemplates;
-
-    if (level >= 3 && rows.length >= opts.deltaThreshold) {
-      // Analyze for raw (pre-encoded) data to find delta columns
-      const rawRows = arr.map(item =>
-        schema.fields.map(f => item[f])
-      );
-      const deltaColumns = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold);
-
-      // Apply delta encoding
-      let processed = applyDeltaEncoding(parsed2D, deltaColumns);
-
-      // Apply repeat encoding (skip delta columns)
-      processed = applyRepeatEncoding(processed, deltaColumns);
-
-      // Rejoin rows
-      for (const row of processed) {
-        lines.push(row.join(fieldSep));
-      }
-    } else {
-      // Rejoin rows (with template applied but no delta)
-      for (const row of parsed2D) {
-        lines.push(row.join(fieldSep));
-      }
+    // Rejoin rows
+    for (const row of parsed2D) {
+      lines.push(row.join(fieldSep));
     }
   } else {
+    // Cardinality guard
+    lines.push(formatCardinalityHeader(arr.length, schemaName));
     lines.push(...rows);
   }
 

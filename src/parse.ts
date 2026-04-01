@@ -295,6 +295,19 @@ function decodeSchemaRows(
   // Split each row into cells
   let cells = rows.map(row => splitRow(row));
 
+  // Layer C: Expand substring dictionary references
+  if (substringDict.length > 0) {
+    const entries: SubstringEntry[] = substringDict.map((value, index) => ({
+      value, index, frequency: 0,
+    }));
+    cells = expandSubstringRefs(cells, entries);
+  }
+
+  // Layer A: Expand column templates
+  if (columnTemplates.length > 0) {
+    cells = expandColumnTemplates(cells, columnTemplates);
+  }
+
   // Level 3: Decode repeat markers (~) first, then deltas
   if (version >= 3) {
     cells = decodeRepeatRows(cells);
@@ -319,19 +332,6 @@ function decodeSchemaRows(
       }
       cells = decodeDeltaRows(cells, deltaColumns, bigintColumns.size > 0 ? bigintColumns : undefined);
     }
-  }
-
-  // Layer C: Expand substring dictionary references
-  if (substringDict.length > 0) {
-    const entries: SubstringEntry[] = substringDict.map((value, index) => ({
-      value, index, frequency: 0,
-    }));
-    cells = expandSubstringRefs(cells, entries);
-  }
-
-  // Layer A: Expand column templates
-  if (columnTemplates.length > 0) {
-    cells = expandColumnTemplates(cells, columnTemplates);
   }
 
   // Convert cells back to objects
