@@ -262,4 +262,72 @@ describe('XRON Output Format Verification', () => {
     // After first row, IDs should be delta-encoded as +1
     expect(output).toContain('+1');
   });
+
+  // ─── Code review findings — regression tests ───────────────────
+
+  const levels = [1, 2, 3] as const;
+
+  describe('Strings starting with [ or { are quoted (review finding #3)', () => {
+    it.each(levels)('string "[INFO] log" round-trips at level %i', (level) => {
+      const data = [
+        { id: 1, msg: '[INFO] server started' },
+        { id: 2, msg: '[WARN] high memory' },
+      ];
+      expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+    });
+
+    it.each(levels)('string "{color: red}" round-trips at level %i', (level) => {
+      const data = [
+        { id: 1, style: '{color: red}' },
+        { id: 2, style: '{color: blue}' },
+      ];
+      expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+    });
+  });
+
+  describe('Boolean recovery in nested schema instances (review finding #4)', () => {
+    it.each(levels)('nested boolean in schema instance round-trips at level %i', (level) => {
+      const data = [
+        { id: 1, settings: { darkMode: true, beta: false }, name: 'Alice' },
+        { id: 2, settings: { darkMode: false, beta: true }, name: 'Bob' },
+        { id: 3, settings: { darkMode: true, beta: false }, name: 'Carol' },
+      ];
+      const result = XRON.parse(XRON.stringify(data, { level }));
+      expect(result).toEqual(data);
+      // Verify booleans are actually boolean, not number 0/1
+      expect(typeof result[0].settings.darkMode).toBe('boolean');
+      expect(typeof result[1].settings.beta).toBe('boolean');
+    });
+  });
+
+  describe('Dictionary values with commas and quotes (review finding #7a)', () => {
+    it.each(levels)('dict value with comma round-trips at level %i', (level) => {
+      const data = [
+        { id: 1, location: 'New York, NY' },
+        { id: 2, location: 'New York, NY' },
+        { id: 3, location: 'Los Angeles, CA' },
+      ];
+      expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+    });
+
+    it.each(levels)('dict value with quotes round-trips at level %i', (level) => {
+      const data = [
+        { id: 1, note: 'He said "hello"' },
+        { id: 2, note: 'He said "hello"' },
+        { id: 3, note: 'She said "goodbye"' },
+      ];
+      expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+    });
+  });
+
+  describe('ISO datetime round-trip (IoT sensor fix)', () => {
+    it.each(levels)('ISO datetime with timezone round-trips at level %i', (level) => {
+      const data = [
+        { ts: '2026-04-01T10:30:00Z', val: 42 },
+        { ts: '2026-04-01T10:31:00Z', val: 43 },
+        { ts: '2026-04-01T10:32:00Z', val: 44 },
+      ];
+      expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+    });
+  });
 });

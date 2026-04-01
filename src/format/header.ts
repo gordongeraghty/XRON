@@ -41,8 +41,14 @@ export function formatSchemaHeader(
  */
 export function formatDictHeader(values: string[]): string {
   if (values.length === 0) return '';
-  // Quote dictionary values that contain commas
-  const escaped = values.map(v => v.includes(',') ? `"${v}"` : v);
+  // Quote dictionary values that contain commas or double quotes,
+  // escaping internal backslashes and quotes first
+  const escaped = values.map(v => {
+    if (v.includes(',') || v.includes('"')) {
+      return `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    }
+    return v;
+  });
   return `@D: ${escaped.join(', ')}`;
 }
 
@@ -109,16 +115,33 @@ export function parseDictHeader(line: string): string[] | null {
 
 /**
  * Parse comma-separated dictionary values, respecting quoted strings.
+ * Handles escaped quotes (\") and backslashes (\\) within quoted values.
  */
 function parseDictValues(input: string): string[] {
   const values: string[] = [];
   let current = '';
   let inQuotes = false;
+  let isEscaped = false;
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
-    if (ch === '"' && (i === 0 || input[i - 1] !== '\\')) {
+
+    if (isEscaped) {
+      // Previous char was backslash — consume the escaped char literally
+      current += ch;
+      isEscaped = false;
+      continue;
+    }
+
+    if (ch === '\\' && inQuotes) {
+      // Start escape sequence inside quotes
+      isEscaped = true;
+      continue;
+    }
+
+    if (ch === '"') {
       inQuotes = !inQuotes;
+      // Don't include the quote character in the value
     } else if (ch === ',' && !inQuotes) {
       values.push(current.trim());
       current = '';

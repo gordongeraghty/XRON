@@ -343,7 +343,23 @@ function decodeSchemaInstance(
       }
     }
 
-    obj[field] = decodeRawValue(raw, version, dictionary);
+    // Check for inline array/object
+    let decoded: any;
+    if (raw.startsWith('[') && raw.endsWith(']')) {
+      decoded = parseInlineBracketArray(raw, version, dictionary, schemasByName);
+    } else if (raw.startsWith('{') && raw.endsWith('}')) {
+      decoded = parseInlineBracketObject(raw, version, dictionary);
+    } else {
+      decoded = decodeRawValue(raw, version, dictionary);
+    }
+
+    // Apply field type hints for lossless boolean round-tripping
+    const fieldType = schema.fieldTypes.get(i);
+    if (fieldType === 'boolean' && typeof decoded === 'number') {
+      decoded = decoded !== 0;
+    }
+
+    obj[field] = decoded;
   }
 
   return obj;

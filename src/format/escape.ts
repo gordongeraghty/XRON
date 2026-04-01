@@ -7,7 +7,7 @@
  *   starts with special prefix ($, +, *, ~, @, -), or looks like a number/boolean/null
  */
 
-const NEEDS_QUOTING_REGEX = /[,\n\r]|^\s|\s$|^[@$+*~\-]|^".*"$/;
+const NEEDS_QUOTING_REGEX = /[,\n\r]|^\s|\s$|^[@$+*~\-\[{]|^".*"$/;
 const LOOKS_LIKE_NUMBER = /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i;
 const RESERVED_WORDS = new Set(['true', 'false', 'null', '-', '1', '0']);
 
