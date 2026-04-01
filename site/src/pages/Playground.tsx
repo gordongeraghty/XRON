@@ -9,7 +9,7 @@ import { countTokens } from '../utils/tokenizer'
 
 type TabId = 'presets' | 'custom'
 
-const DEFAULT_ACTIVE: FormatId[] = ['json', 'xron-1', 'xron-2', 'xron-3']
+const DEFAULT_ACTIVE: FormatId[] = ['json', 'toon', 'tron', 'xron-2', 'xron-3', 'xron-auto']
 
 export default function Playground() {
   const [tab, setTab] = useState<TabId>('presets')

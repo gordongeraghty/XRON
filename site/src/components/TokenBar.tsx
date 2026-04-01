@@ -10,6 +10,8 @@ interface TokenBarProps {
 const BAR_COLORS: Record<FormatId, string> = {
   'json':        'bg-slate-400 dark:bg-slate-500',
   'json-pretty': 'bg-blue-400 dark:bg-blue-500',
+  'toon':        'bg-teal-400 dark:bg-teal-500',
+  'tron':        'bg-cyan-400 dark:bg-cyan-500',
   'xron-1':      'bg-violet-400 dark:bg-violet-500',
   'xron-2':      'bg-purple-500 dark:bg-purple-400',
   'xron-3':      'bg-fuchsia-500 dark:bg-fuchsia-400',

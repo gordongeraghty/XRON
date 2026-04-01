@@ -84,8 +84,8 @@ export function decodeTypedValue(raw: string, level: XronLevel): any {
     return base62ToUuid(raw.slice(1));
   }
 
-  // Compact date (Level 2+): 8+ digit string that looks like YYYYMMDD...
-  if (level >= 2 && /^\d{8,}$/.test(raw) && isCompactDate(raw)) {
+  // Compact date (Level 2+): YYYYMMDD or YYYYMMDDTHHMMSSZ etc.
+  if (level >= 2 && /^\d{8}/.test(raw) && isCompactDate(raw)) {
     return expandDate(raw);
   }
 

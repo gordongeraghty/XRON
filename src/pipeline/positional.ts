@@ -112,26 +112,35 @@ export function splitRow(row: string): string[] {
   const values: string[] = [];
   let current = '';
   let inQuotes = false;
-  let parenDepth = 0;
+  let depth = 0; // nesting depth for (), [], {}
+
+  let isEscaped = false;
 
   for (let i = 0; i < row.length; i++) {
     const ch = row[i];
 
-    if (ch === '"' && (i === 0 || row[i - 1] !== '\\')) {
+    if (ch === '\\' && !isEscaped) {
+      isEscaped = true;
+      current += ch;
+      continue;
+    }
+
+    if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
       current += ch;
-    } else if (!inQuotes && ch === '(') {
-      parenDepth++;
+    } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
+      depth++;
       current += ch;
-    } else if (!inQuotes && ch === ')') {
-      parenDepth--;
+    } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
+      depth--;
       current += ch;
-    } else if (ch === ',' && !inQuotes && parenDepth === 0) {
+    } else if (ch === ',' && !inQuotes && depth === 0) {
       values.push(current.trim());
       current = '';
     } else {
       current += ch;
     }
+    isEscaped = false;
   }
 
   if (current.trim().length > 0) {

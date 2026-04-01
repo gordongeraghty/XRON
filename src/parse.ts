@@ -289,7 +289,15 @@ function decodeSchemaRows(
         }
       }
 
-      let decoded = decodeRawValue(raw, version, dictionary);
+      // Check for inline array [val, val, ...] or object {key: val, ...}
+      let decoded: any;
+      if (raw.startsWith('[') && raw.endsWith(']')) {
+        decoded = parseInlineBracketArray(raw, version, dictionary, schemasByName);
+      } else if (raw.startsWith('{') && raw.endsWith('}')) {
+        decoded = parseInlineBracketObject(raw, version, dictionary);
+      } else {
+        decoded = decodeRawValue(raw, version, dictionary);
+      }
 
       // Apply field type hints for lossless boolean round-tripping
       const fieldType = schema.fieldTypes.get(i);
@@ -413,11 +421,11 @@ function parseKeyValueBlock(
     const line = lines[i];
     if (line.trim() === '' || line.trim().startsWith('#')) continue;
 
-    const colonIdx = line.indexOf(':');
-    if (colonIdx === -1) continue;
+    const [keyPart, valuePartRaw] = splitKeyValue(line);
+    if (!keyPart) continue;
 
-    const key = line.slice(0, colonIdx).trim();
-    const valuePart = line.slice(colonIdx + 1).trim();
+    const key = unescapeValue(keyPart.trim());
+    const valuePart = valuePartRaw.trim();
 
     if (valuePart === '') {
       // Value is on next indented lines — collect nested block
@@ -453,7 +461,7 @@ function parseKeyValueBlock(
     } else if (valuePart.startsWith('[') && valuePart.endsWith(']')) {
       // Inline array: [val1, val2, val3]
       const inner = valuePart.slice(1, -1);
-      result[key] = splitRow(inner).map(v => decodeRawValue(v.trim(), version, dictionary));
+      result[key] = splitTopLevel(inner).map(v => decodeRawValue(v.trim(), version, dictionary));
     } else {
       result[key] = decodeRawValue(valuePart, version, dictionary);
     }
@@ -511,10 +519,10 @@ function parseInlineBracketObject(
   const pairs = splitTopLevel(inner);
 
   for (const pair of pairs) {
-    const colonIdx = pair.indexOf(':');
-    if (colonIdx === -1) continue;
-    const key = pair.slice(0, colonIdx).trim();
-    const rawVal = pair.slice(colonIdx + 1).trim();
+    const [keyPart, rawValPart] = splitKeyValue(pair);
+    if (!keyPart) continue;
+    const key = unescapeValue(keyPart.trim());
+    const rawVal = rawValPart.trim();
 
     if (rawVal.startsWith('{') && rawVal.endsWith('}')) {
       obj[key] = parseInlineBracketObject(rawVal, version, dictionary);
@@ -537,9 +545,18 @@ function splitTopLevel(input: string): string[] {
   let depth = 0;
   let inQuotes = false;
 
+  let isEscaped = false;
+
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
-    if (ch === '"' && (i === 0 || input[i - 1] !== '\\')) {
+    
+    if (ch === '\\' && !isEscaped) {
+      isEscaped = true;
+      current += ch;
+      continue;
+    }
+
+    if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
       current += ch;
     } else if (!inQuotes && (ch === '{' || ch === '[' || ch === '(')) {
@@ -554,7 +571,33 @@ function splitTopLevel(input: string): string[] {
     } else {
       current += ch;
     }
+    isEscaped = false;
   }
   if (current.trim()) parts.push(current.trim());
   return parts;
 }
+
+/**
+ * Split a key-value pair at the first colon outside of quotes.
+ */
+function splitKeyValue(str: string): [string, string] {
+  let inQuotes = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '\\' && !isEscaped) {
+      isEscaped = true;
+      continue;
+    }
+    if (ch === '"' && !isEscaped) {
+      inQuotes = !inQuotes;
+    } else if (ch === ':' && !inQuotes) {
+      return [str.slice(0, i), str.slice(i + 1)];
+    }
+    isEscaped = false;
+  }
+  return ['', ''];
+}
+
+import { unescapeValue } from './format/escape.js';

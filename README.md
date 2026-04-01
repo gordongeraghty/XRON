@@ -10,14 +10,14 @@
 
 ## The Problem: JSON's Token Tax
 
-Every time you send structured data to an LLM, JSON imposes a brutal overhead:
+Every time you send structured data to an LLM, JSON imposes significant token overhead:
 
 - **Repeated keys**: `{"name":"Alice","name":"Bob","name":"Carol"}` -- the key `"name"` is paid for on every single object.
-- **Structural punctuation**: Braces `{}`, brackets `[]`, colons `:`, and quotes `"` each consume a BPE token. A 500-row JSON array wastes thousands of tokens on syntax alone.
+- **Structural punctuation**: Braces `{}`, brackets `[]`, colons `:`, and quotes `"` each consume a BPE token. A 500-row JSON array consumes thousands of additional tokens on syntax alone.
 - **No compression**: Repeated values like `"Engineering"` appearing 50 times cost the same 50 times.
 - **No numeric awareness**: Sequential IDs `1, 2, 3, ... 500` are encoded verbatim, even though the pattern is trivially compressible.
 
-For a typical 500-user dataset, JSON consumes **~4,200 tokens**. At $15/MTok (GPT-4o output pricing), that is $0.063 per query. Across millions of API calls, the cost is substantial -- and the wasted tokens also consume context window space that could hold actual instructions or conversation history.
+For a typical 500-user dataset, JSON consumes **~4,200 tokens**. At $15/MTok (GPT-4o output pricing), that is $0.063 per query. These tokens also consume context window space that could hold actual instructions or conversation history.
 
 ## The Solution: XRON's 6-Layer Compression Pipeline
 
@@ -530,7 +530,7 @@ A 3, Carol Williams, carol@example.com, Sales, true
 ...
 ```
 
-> **Note**: At 10 rows, TOON and TRON perform similarly to XRON L1 because key elimination is the dominant win. XRON L2 pulls ahead via dictionary encoding (`Sales` → `$1`), and L3 adds delta (`+1`) and repeat (`~`) markers. The gap widens dramatically at scale.
+> **Note**: At 10 rows, TOON and TRON perform similarly to XRON L1 because key elimination is the dominant win. XRON L2 pulls ahead via dictionary encoding (`Sales` → `$1`), and L3 adds delta (`+1`) and repeat (`~`) markers. The gap increases with dataset size.
 
 ### At Scale: 100-Row Dataset (7 fields)
 

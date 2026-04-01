@@ -59,23 +59,35 @@ export function stringify(value: any, options?: XronOptions): string {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   // ── Adaptive level selection ─────────────────────────────────────────────
+  // Auto mode tries ALL levels and picks whichever produces the smallest output.
+  // This guarantees auto never recommends L3 when L2 is actually smaller.
   const isAuto = opts.level === 'auto';
   if (isAuto) {
-    // Primitives are always returned verbatim — no schema-level benefit
-    if (
-      value === null || value === undefined ||
-      typeof value !== 'object'
-    ) {
-      // Fall through to primitive handling below with level=1
-      opts.level = 1;
-    } else {
-      const rec = assessData(value, opts);
-      if (!rec.willCompress) {
-        // Below size threshold — return minified JSON
-        return JSON.stringify(value);
-      }
-      opts.level = rec.recommendedLevel;
+    // Return primitives directly
+    if (value === null || value === undefined || typeof value !== 'object') {
+      return stringify(value, { ...opts, level: 1 });
     }
+
+    const jsonStr = JSON.stringify(value);
+    const minSize = opts.minCompressSize ?? 0;
+    
+    if (minSize > 0 && jsonStr.length < minSize) {
+      return jsonStr;
+    }
+
+    // Try all levels and pick the shortest output
+    let bestOutput = jsonStr;
+    for (const lvl of [1, 2, 3] as const) {
+      try {
+        const candidate = stringify(value, { ...opts, level: lvl });
+        if (candidate.length < bestOutput.length) {
+          bestOutput = candidate;
+        }
+      } catch {
+        // If a level fails, skip it
+      }
+    }
+    return bestOutput;
   }
 
   const level = opts.level as XronLevel;
@@ -127,19 +139,7 @@ export function stringify(value: any, options?: XronOptions): string {
   const dataLines = encodeData(value, schemas, dictLookup, level, opts, seen, 0);
   lines.push(...dataLines);
 
-  const xronOutput = lines.join(sepConfig.rowSep);
-
-  // ── Auto guarantee: XRON output is never larger than minified JSON ───────
-  // For tiny payloads the @v header + schema line can exceed JSON overhead.
-  // In auto mode, fall back to JSON when that happens — true "compress only when beneficial".
-  if (isAuto) {
-    const jsonStr = JSON.stringify(value);
-    if (xronOutput.length >= jsonStr.length) {
-      return jsonStr;
-    }
-  }
-
-  return xronOutput;
+  return lines.join(sepConfig.rowSep);
 }
 
 /**
@@ -232,8 +232,12 @@ function encodeSchemaArray(
   // Cardinality guard
   lines.push(formatCardinalityHeader(arr.length, schemaName));
 
-  // Encode values positionally
+  // Encode values positionally — use encodePrimitive for simple values,
+  // encodeInlineValue for arrays/objects that aren't nested schemas
   const valueEncoder = (val: any, allSchemas: Map<string, SchemaDefinition>): string => {
+    if (val !== null && typeof val === 'object') {
+      return encodeInlineValue(val, level, dictLookup, seen);
+    }
     return encodePrimitive(val, level, dictLookup);
   };
 
@@ -345,7 +349,7 @@ function encodeInlineValue(
     const pairs: string[] = [];
     for (const [k, v] of Object.entries(value)) {
       if (v === undefined) continue;
-      pairs.push(`${k}: ${encodeInlineValue(v, level, dictLookup, seen)}`);
+      pairs.push(`${escapeValue(k)}: ${encodeInlineValue(v, level, dictLookup, seen)}`);
     }
     return `{${pairs.join(', ')}}`;
   } finally {
