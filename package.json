@@ -1,6 +1,7 @@
 {
   "name": "xron-format",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "homepage": "https://gordongeraghty.github.io/XRON/",
   "description": "Extensible Reduced Object Notation — lossless data serialization achieving ~80% token reduction for LLM contexts",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -8,9 +9,9 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "files": [
