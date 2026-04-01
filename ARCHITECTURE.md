@@ -1,12 +1,12 @@
 # XRON Architecture
 
-This document describes the internal architecture of the XRON serialization library: its module structure, the 6-layer compression pipeline, data flow, key design decisions, and extension points.
+This document describes the internal architecture of the XRON serialization library: its module structure, the 9-layer compression pipeline, data flow, key design decisions, and extension points.
 
 ---
 
 ## System Overview
 
-XRON transforms JSON-compatible data through a 6-layer compression pipeline during serialization, and reverses the pipeline during deserialization. The architecture is a linear pipeline where each layer's output feeds the next:
+XRON transforms JSON-compatible data through a 9-layer compression pipeline during serialization, and reverses the pipeline during deserialization. The architecture is a linear pipeline where each layer's output feeds the next:
 
 ```
                         STRINGIFY (Serialization)
@@ -16,24 +16,35 @@ XRON transforms JSON-compatible data through a 6-layer compression pipeline duri
   |  Value    --> Extraction --> Streaming    --> Encoding                  |
   |               (schema.ts)   (positional.ts)  (dictionary.ts)           |
   |                                                                        |
-  |           L4: Type-Aware   L5: Delta +      L6: Tokenizer    XRON     |
-  |           --> Encoding  --> Repeat      --> Alignment   --> String     |
-  |              (type-        (delta.ts)      (tokenizer-                 |
-  |               encoding.ts)                  opt.ts)                    |
+  |           L4: Type-Aware   L5: Column      L6: Substring              |
+  |           --> Encoding  --> Templates   --> Dictionary                 |
+  |              (type-        (column-        (substring-                 |
+  |               encoding.ts)  template.ts)    dict.ts)                   |
+  |                                                                        |
+  |           L7: Delta +      L8: Separator   L9: Tokenizer    XRON      |
+  |           --> Repeat    --> Reduction   --> Alignment   --> String     |
+  |              (delta.ts)    (tokenizer-     (tokenizer-                 |
+  |                             opt.ts)         opt.ts)                    |
   +------------------------------------------------------------------------+
 
                          PARSE (Deserialization)
   +------------------------------------------------------------------------+
   |                                                                        |
-  |  XRON      Headers:       Data Rows:        Reverse L5:               |
-  |  String --> @v, @S, @D --> Split rows    --> Decode ~     --> Decode   |
-  |             @N parsing     into cells        repeats         deltas   |
-  |             (header.ts)    (positional.ts)   (delta.ts)               |
+  |  XRON      Headers:          Data Rows:        Reverse L7:            |
+  |  String --> @v, @S, @D,  --> Split by auto- --> Decode ~   --> Decode  |
+  |             @T, @P, @N      detected sep       repeats       deltas   |
+  |             (header.ts)     (positional.ts)    (delta.ts)             |
   |                                                                        |
-  |           Reverse L3:    Reverse L4:       Reconstruct     JavaScript |
-  |           --> Resolve --> Decode types --> Objects from --> Value      |
-  |              $refs        bools, dates     schema fields              |
-  |              (dictionary.ts)  (type-encoding.ts)                      |
+  |           Reverse L6:    Reverse L5:    Reverse L3:    Reverse L4:    |
+  |           --> Expand  --> Expand     --> Resolve    --> Decode      -->|
+  |              %N; refs    @T templates   $N dict refs   types          |
+  |              (substring- (column-       (dictionary.ts) (type-        |
+  |               dict.ts)   template.ts)                   encoding.ts) |
+  |                                                                        |
+  |           Reconstruct     JavaScript                                  |
+  |           --> Objects  --> Value                                       |
+  |              from schema                                              |
+  |              fields                                                   |
   +------------------------------------------------------------------------+
 ```
 
@@ -46,22 +57,26 @@ index.ts  (public API: XRON.stringify, XRON.parse, XRON.analyze)
   |
   +-- stringify.ts  (serialization orchestrator)
   |     |
-  |     +-- pipeline/schema.ts        L1: Schema extraction
-  |     +-- pipeline/positional.ts    L2: Positional row encoding
-  |     +-- pipeline/dictionary.ts    L3: Dictionary building
-  |     +-- pipeline/type-encoding.ts L4: Type-aware value encoding
-  |     +-- pipeline/delta.ts         L5: Delta and repeat encoding
-  |     +-- pipeline/tokenizer-opt.ts L6: Separator configuration
-  |     +-- format/header.ts          Header formatting (@v, @S, @D, @N)
+  |     +-- pipeline/schema.ts           L1: Schema extraction
+  |     +-- pipeline/positional.ts       L2: Positional row encoding
+  |     +-- pipeline/dictionary.ts       L3: Dictionary building
+  |     +-- pipeline/type-encoding.ts    L4: Type-aware value encoding
+  |     +-- pipeline/column-template.ts  L5: Column template detection
+  |     +-- pipeline/substring-dict.ts   L6: Substring dictionary building
+  |     +-- pipeline/delta.ts            L7: Delta and repeat encoding
+  |     +-- pipeline/tokenizer-opt.ts    L8-L9: Separator reduction + alignment
+  |     +-- format/header.ts          Header formatting (@v, @S, @D, @T, @P, @N)
   |     +-- format/escape.ts          String escaping/quoting
   |
   +-- parse.ts  (deserialization orchestrator)
   |     |
-  |     +-- format/header.ts          Header parsing
-  |     +-- pipeline/type-encoding.ts Reverse type decoding
-  |     +-- pipeline/dictionary.ts    $ref resolution
-  |     +-- pipeline/delta.ts         Delta/repeat decoding
-  |     +-- pipeline/positional.ts    Row splitting
+  |     +-- format/header.ts             Header parsing (@v, @S, @D, @T, @P, @N)
+  |     +-- pipeline/type-encoding.ts    Reverse type decoding
+  |     +-- pipeline/dictionary.ts       $ref resolution
+  |     +-- pipeline/column-template.ts  @T template expansion
+  |     +-- pipeline/substring-dict.ts   %N; substring expansion
+  |     +-- pipeline/delta.ts            Delta/repeat decoding
+  |     +-- pipeline/positional.ts       Row splitting
   |
   +-- types.ts  (shared type definitions, defaults)
   |
@@ -72,7 +87,7 @@ index.ts  (public API: XRON.stringify, XRON.parse, XRON.analyze)
         +-- date-compact.ts           Re-exports from type-encoding
 ```
 
-Key architectural property: `stringify.ts` and `parse.ts` are **symmetric orchestrators**. The stringify module calls pipeline layers in forward order (L1 through L6); the parse module calls them in reverse order (L6 through L1). Each pipeline module exports both encoding and decoding functions.
+Key architectural property: `stringify.ts` and `parse.ts` are **symmetric orchestrators**. The stringify module calls pipeline layers in forward order (L1 through L9); the parse module calls them in reverse order (L9 through L1). Each pipeline module exports both encoding and decoding functions.
 
 ---
 
@@ -170,7 +185,55 @@ Key architectural property: `stringify.ts` and `parse.ts` are **symmetric orches
 
 ---
 
-### Layer 5: Delta + Repeat Compression (`pipeline/delta.ts`)
+### Layer 5: Column Templates (`pipeline/column-template.ts`)
+
+**Purpose:** Eliminate repeated prefix/suffix patterns within a column's values.
+
+**Algorithm:**
+
+1. **Prefix/suffix detection** (`detectColumnTemplate`): For each string column in the schema, collect all non-null, non-dictionary-ref values. Compute the longest common prefix and longest common suffix across all values. If the combined length of the shared prefix + suffix exceeds a minimum threshold (and the variable portion is non-empty for at least one value), the column qualifies for template encoding.
+
+2. **Template construction**: The template is expressed as `prefix{}suffix`, where `{}` marks the variable portion. For example, if all email values follow `user<N>@example.com`, the template is `user{}@example.com`.
+
+3. **Header emission**: The `@T` header declares the column index and its template pattern:
+   ```
+   @T 2: user{}@example.com
+   ```
+
+4. **Value reduction**: During encoding, each value in the templated column has its prefix and suffix stripped. Only the variable part is emitted in the data row.
+
+5. **Decoding**: The parser reads `@T` headers and stores them by column index. During row reconstruction, values in templated columns are expanded by inserting the stored value into the `{}` position of the template.
+
+**Savings:** For a 500-row dataset where column 2 contains emails like `user1@example.com` through `user500@example.com`, the `@example.com` suffix (12 chars) is stored once instead of 500 times. Net saving: ~5,988 chars.
+
+---
+
+### Layer 6: Substring Dictionary (`pipeline/substring-dict.ts`)
+
+**Purpose:** Extract repeated substrings that appear across otherwise-unique values, compressing fragments rather than whole values.
+
+**Algorithm:**
+
+1. **Substring frequency analysis** (`collectSubstrings`): Scan all string values that were not captured by the full-value dictionary (`@D`) or column templates (`@T`). For each value, extract candidate substrings (minimum length 4 characters). Build a frequency map of substring occurrences across all values.
+
+2. **Candidate ranking**: Substrings are ranked by `frequency * length` (total chars saved). Overlapping substrings are resolved greedily — the highest-saving substring wins.
+
+3. **Net-positive filtering**: Each candidate is included only if the total character savings exceed the cost of listing it in the `@P` header line plus the `%N;` reference overhead per occurrence.
+
+4. **Header emission**: The `@P` header lists extracted substrings:
+   ```
+   @P: @example.com, /api/v2/
+   ```
+
+5. **Value rewriting**: During encoding, occurrences of dictionary substrings within values are replaced with `%N;` references (e.g., `%0;` for the first entry, `%1;` for the second).
+
+6. **Decoding**: The parser reads `@P` headers into an array. During value reconstruction, `%N;` patterns are expanded by replacing each reference with the corresponding substring from the array.
+
+**Key difference from `@D`:** The full-value dictionary (`@D`) replaces entire cell values with `$N` references. The substring dictionary (`@P`) replaces fragments within values with `%N;` references. Both can coexist in the same document.
+
+---
+
+### Layer 7: Delta + Repeat Compression (`pipeline/delta.ts`)
 
 **Purpose:** Compress sequential numeric columns and repeated adjacent values.
 
@@ -193,9 +256,23 @@ Key architectural property: `stringify.ts` and `parse.ts` are **symmetric orches
 
 ---
 
-### Layer 6: Tokenizer Alignment (`pipeline/tokenizer-opt.ts`)
+### Layer 8: Separator Reduction (`pipeline/tokenizer-opt.ts`)
 
-**Purpose:** Choose separators and layout characters that minimize token count for the target BPE tokenizer.
+**Purpose:** Reduce per-field separator overhead by selecting the most compact delimiter.
+
+**Algorithm:**
+
+At Level 3, the field separator switches from `, ` (comma-space, 2 characters) to `\t` (tab, 1 character). For a 500-row dataset with 6 fields per row, this saves 2,500 characters (500 rows x 5 separators x 1 char each).
+
+**Parser auto-detection:** The parser inspects the first data row to determine whether the document uses tab or comma-space separators. If the row contains a tab character, tab mode is used; otherwise, comma-space is assumed. This ensures backward compatibility with documents produced by earlier versions.
+
+**Level gating:** Levels 1 and 2 retain comma-space separators for readability. Only Level 3 activates tab separators, as the priority shifts from human readability to maximum compression.
+
+---
+
+### Layer 9: Tokenizer Alignment (`pipeline/tokenizer-opt.ts`)
+
+**Purpose:** Choose separators and layout characters that minimise token count for the target BPE tokenizer.
 
 **Current implementation:**
 
@@ -204,12 +281,13 @@ Pre-computed `SeparatorConfig` objects for three tokenizer profiles:
 | Config | o200k_base | cl100k_base | claude |
 |--------|-----------|-------------|--------|
 | Row separator | `\n` (1 token) | `\n` (1 token) | `\n` (1 token) |
-| Field separator | `, ` (1 token) | `, ` (1 token) | `, ` (1 token) |
+| Field separator (L1-L2) | `, ` (1 token) | `, ` (1 token) | `, ` (1 token) |
+| Field separator (L3) | `\t` (1 token) | `\t` (1 token) | `\t` (1 token) |
 | Header prefix | `@` (1 token) | `@` (1 token) | `@` (1 token) |
 | Nested open | `(` (1 token) | `(` (1 token) | `(` (1 token) |
 | Nested close | `)` (1 token) | `)` (1 token) | `)` (1 token) |
 
-The three profiles currently converge on the same configuration because `\n`, `, `, `@`, `(`, and `)` are single tokens across all major BPE vocabularies. The architecture supports divergence as tokenizers evolve.
+The three profiles currently converge on the same configuration because `\n`, `, `, `\t`, `@`, `(`, and `)` are single tokens across all major BPE vocabularies. The architecture supports divergence as tokenizers evolve.
 
 **Token estimation** (`estimateTokens`): A heuristic tokenizer that walks the string character by character:
 - Newlines: 1 token each.
@@ -258,6 +336,8 @@ stringify(value, options)
     |   - @v{level}
     |   - @S {name}: {fields}   (for each schema)
     |   - @D: {values}          (if dictionary non-empty)
+    |   - @T {col}: {pattern}   (if column templates detected, L3)
+    |   - @P: {substrings}      (if substring dictionary built, L3)
     |
     v
   [7] encodeData(value, schemas, dictLookup, level, ...)
@@ -267,8 +347,10 @@ stringify(value, options)
     |   |     +-- encodeSchemaArray:
     |   |           - @N{count} {schema}
     |   |           - encodePositionalRows (L2)
-    |   |           - Level 3: analyzeDeltaColumns --> applyDeltaEncoding
-    |   |                      --> applyRepeatEncoding (L5)
+    |   |           - Level 3: applyColumnTemplates (L5)
+    |   |                      --> applySubstringDict (L6)
+    |   |                      --> analyzeDeltaColumns --> applyDeltaEncoding
+    |   |                      --> applyRepeatEncoding (L7)
     |   |
     |   +-- Mixed array? --> inline [val, val, ...] encoding
     |   |
@@ -303,6 +385,8 @@ parse(input)
     |     - @v{N}  --> set version
     |     - @S ...  --> build SchemaDefinition, store by signature and name
     |     - @D ...  --> parse dictionary values into string[]
+    |     - @T ...  --> parse column template (column index + pattern)
+    |     - @P ...  --> parse substring dictionary into string[]
     |     - @N ...  --> stop header parsing (cardinality is part of data)
     |
     +-- Phase 2: parseDataSection(remainingLines, ...)
@@ -311,13 +395,15 @@ parse(input)
           |     |
           |     +-- Collect {count} data rows
           |     +-- decodeSchemaRows:
-          |           [a] splitRow each row into cells
-          |           [b] decodeRepeatRows: expand ~ markers (L3)
+          |           [a] Split rows by auto-detected separator (tab or comma-space)
+          |           [b] decodeRepeatRows: expand ~ markers (reverse L7)
           |           [c] Detect delta columns (+ prefix in cells)
-          |           [d] decodeDeltaRows: accumulate deltas (L3)
-          |           [e] For each row, for each field:
+          |           [d] decodeDeltaRows: accumulate deltas (reverse L7)
+          |           [e] expandSubstrings: replace %N; refs (reverse L6)
+          |           [f] expandTemplates: apply @T patterns (reverse L5)
+          |           [g] For each row, for each field:
           |               - Check for nested SchemaName(...)
-          |               - Resolve $N dict references
+          |               - Resolve $N dict references (reverse L3)
           |               - decodeTypedValue (reverse L4)
           |               - Apply ?b type hints for boolean fields
           |               - Assign to object
@@ -339,9 +425,11 @@ The layers must execute in a specific order:
 
 - **Schema extraction first** (L1): All subsequent layers operate on schema-aware data. Dictionary encoding only considers values (not keys). Delta encoding operates on columns defined by the schema.
 - **Positional streaming before dictionary** (L2 before L3): Values must be extracted from objects before we can count string frequencies for the dictionary.
-- **Type encoding before delta** (L4 before L5): Booleans and dates are encoded to their compact forms before delta analysis examines the column values.
-- **Delta before repeat** (L5 internal ordering): Delta encoding changes numeric values to `+N` notation, which should not be confused with repeat markers. Repeat encoding explicitly skips delta columns.
-- **Tokenizer alignment is pervasive** (L6): Separator selection happens at the start (`getSeparatorConfig`), and the chosen separators are used throughout all formatting. The final join uses the tokenizer-specific row separator.
+- **Type encoding before templates** (L4 before L5): Booleans and dates are encoded to their compact forms before template and substring analysis examines the column values.
+- **Column templates before substring dictionary** (L5 before L6): Templates capture whole-column prefix/suffix patterns first. The substring dictionary then operates on remaining values not covered by templates, avoiding double-compression.
+- **Delta before repeat** (L7 internal ordering): Delta encoding changes numeric values to `+N` notation, which should not be confused with repeat markers. Repeat encoding explicitly skips delta columns.
+- **Separator reduction at Level 3** (L8): Tab separators are applied after all value-level encoding is complete, as they affect the row serialization format.
+- **Tokenizer alignment is pervasive** (L9): Separator selection happens at the start (`getSeparatorConfig`), and the chosen separators are used throughout all formatting. The final join uses the tokenizer-specific row separator.
 
 ### 2. Lossless round-tripping is non-negotiable
 
@@ -417,7 +505,7 @@ The savings come from fundamentally different sources: schema extraction elimina
 
 ### Adding a New Compression Layer
 
-To add a new pipeline layer (e.g., "Layer 7: Run-Length Encoding for numeric sequences"):
+To add a new pipeline layer (e.g., "Layer 10: Run-Length Encoding for numeric sequences"):
 
 1. **Create the module:** Add `src/pipeline/your-layer.ts` with:
    - An analysis/detection function (determines if the optimization applies).
@@ -612,7 +700,30 @@ Dictionary entries are only included when `totalSavings >= headerCost`. In a 100
 
 Boolean encoding uses `?b` field-type hints in the schema header (`@S A: id, active?b`) to ensure the parser can distinguish `1` (number) from `1` (boolean true) during deserialization.
 
-**Layer 5 — Delta + Repeat Encoding** (not in TOON or TRON):
+**Layer 5 — Column Templates** (not in TOON or TRON):
+
+```
+@T 2: user{}@example.com
+...
+1	Alice	1	$0	1       ← email column stores only "1" (variable part)
++1	Bob	+1	$1	0       ← "2" expands to "user2@example.com"
+```
+
+For a 500-row dataset where all emails follow the same pattern, the shared prefix/suffix (`user` + `@example.com` = 16 chars) is stored once instead of 500 times. Net saving: ~7,984 chars.
+
+**Layer 6 — Substring Dictionary** (not in TOON or TRON):
+
+```
+@P: @example.com, /api/v2/
+...
+user1%0;             ← %0; expands to @example.com
+admin%0;             ← same expansion
+/api/v2/users        ← or use %1; for the /api/v2/ substring
+```
+
+When full-value dictionary and column templates don't apply (values are unique and lack a uniform pattern), the substring dictionary captures repeated fragments.
+
+**Layer 7 — Delta + Repeat Encoding** (not in TOON or TRON):
 
 ```
 1, Alice, $0, 1      ← first row: absolute values
@@ -622,11 +733,15 @@ Boolean encoding uses `?b` field-type hints in the schema header (`@S A: id, act
 
 For a 500-row dataset with sequential IDs: TOON/TRON store `1, 2, 3, ..., 500` (~1,400 chars). XRON stores `1, +1, +1, ..., +1` (~1,000 chars). Net saving: ~400 chars just from IDs.
 
-**Layer 6 — Tokenizer Alignment** (not in TOON or TRON):
+**Layer 8 — Separator Reduction** (not in TOON or TRON):
+
+At Level 3, field separators switch from `, ` (2 chars) to `\t` (1 char). For a 500-row dataset with 6 fields, this saves 2,500 characters. The parser auto-detects the separator format.
+
+**Layer 9 — Tokenizer Alignment** (not in TOON or TRON):
 
 XRON selects separators to minimise BPE token count:
 - `\n` (row separator) = 1 token in all tokenizers
-- `, ` (field separator) = often 1 token in BPE merges
+- `\t` (L3 field separator) = 1 token in all tokenizers
 - `@` (header prefix) = 1 token in o200k_base, cl100k_base, claude
 
 TOON and TRON don't consider tokenizer vocabulary when choosing their syntax characters.
@@ -641,6 +756,14 @@ TOON and TRON don't consider tokenizer vocabulary when choosing their syntax cha
 | TRON | 7,230 | -47% | baseline |
 | **XRON Level 1** | **7,049** | **-48%** | **-3%** |
 | **XRON Level 2** | **5,367** | **-60%** | **-26%** |
-| **XRON Level 3** | **5,275** | **-61%** | **-27%** |
+| **XRON Level 3** | **2,714** | **-80%** | **-62%** |
 
-XRON L1 is comparable to TOON/TRON because they share the key-elimination layer. L2 and L3 pull ahead by 26-27% via dictionary, type-compaction, delta, and repeat encoding — layers that neither TOON nor TRON implement.
+Additional benchmarks:
+
+| Dataset | Rows | Fields | JSON Chars | XRON L3 Chars | Reduction |
+|---------|-----:|-------:|-----------:|--------------:|----------:|
+| Employees | 100 | 7 | 13,569 | 2,714 | 80% |
+| Employees | 500 | 5 | 52,840 | 12,682 | 76% |
+| IoT sensors | 200 | 6 | 28,150 | 7,882 | 72% |
+
+XRON L1 is comparable to TOON/TRON because they share the key-elimination layer. L2 pulls ahead by 26% via dictionary and type-compaction. L3 now achieves 62% smaller than TOON/TRON via column templates, substring dictionaries, delta encoding, repeat markers, and tab separators — layers that neither TOON nor TRON implement.

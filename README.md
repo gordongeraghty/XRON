@@ -597,7 +597,10 @@ At 100 rows, XRON L3 is **62% smaller than TOON/TRON** — the gap comes from co
 | Date compaction | ❌ | ❌ | ✅ | `"2026-04-01"` → `20260401` (no quotes, no hyphens) |
 | UUID compression | ❌ | ❌ | ✅ | 36-char UUID → ~22-char Base62 |
 | Delta encoding (`+1`) | ❌ | ❌ | ✅ | Sequential IDs: `1, 2, 3, ..., 100` → `1, +1, +1, ...` |
+| Column templates (`@T`) | ❌ | ❌ | ✅ | `user1@example.com` → `1` with template `user{}@example.com` |
+| Substring dictionary (`@P`) | ❌ | ❌ | ✅ | Repeated substrings across unique values → `%N;` refs |
 | Repeat markers (`~`) | ❌ | ❌ | ✅ | Consecutive same values: `Sales, Sales` → `Sales, ~` |
+| Separator reduction | ❌ | ❌ | ✅ | Tab separators at L3 save 1 char per field boundary |
 | Cardinality guards (`@N`) | ❌ | ❌ | ✅ | `@N100 A` — parser knows row count upfront (streaming) |
 | Adaptive level selection | ❌ | ❌ | ✅ | Auto-picks best level, returns JSON for tiny payloads |
 | Multi-tokenizer profiles | ❌ | ❌ | ✅ | Optimises separators for o200k_base, cl100k_base, claude |
@@ -674,7 +677,10 @@ Supports `o200k_base` (GPT-4o/GPT-5), `cl100k_base` (GPT-4/GPT-3.5), and `claude
 | Nested objects | Yes | Yes | No | Yes | Yes | Yes |
 | Schema extraction | No | No | No | No | No | Yes |
 | Dictionary encoding | No | No | No | No | No | Yes |
+| Column templates | No | No | No | No | No | Yes |
+| Substring dictionary | No | No | No | No | No | Yes |
 | Delta compression | No | No | No | No | No | Yes |
+| Separator reduction | No | No | No | No | No | Yes |
 | Tokenizer alignment | No | No | No | No | No | Yes |
 | Type-aware encoding | No | No | No | Partial | Partial | Yes |
 | Token reduction | 0% | ~5% | ~40% | ~33% | ~50% | ~80% |
@@ -711,7 +717,7 @@ npm test
 ```
 src/
   index.ts              Main entry point, XRON namespace, analyze()
-  stringify.ts           Serialization engine (6-layer pipeline orchestration)
+  stringify.ts           Serialization engine (9-layer pipeline orchestration)
   parse.ts              Deserialization engine (reverse pipeline)
   types.ts              Core type definitions and defaults
   pipeline/
@@ -720,8 +726,10 @@ src/
     positional.ts       L2: Positional value streaming
     dictionary.ts       L3: Dictionary building and reference encoding
     type-encoding.ts    L4: Type-aware compact encoding
-    delta.ts            L5: Delta and repeat compression
-    tokenizer-opt.ts    L6: Tokenizer alignment and BPE optimization
+    column-template.ts  L5: Column template detection and encoding
+    substring-dict.ts   L6: Substring frequency analysis and encoding
+    delta.ts            L7: Delta and repeat compression
+    tokenizer-opt.ts    L8-L9: Separator reduction and tokenizer alignment
   format/
     header.ts           @v, @S, @D, @N header formatting and parsing
     escape.ts           String escaping and quoting rules
