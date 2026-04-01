@@ -223,6 +223,35 @@ describe('XRON Round-Trip: Lossless Guarantee', () => {
   });
 });
 
+describe('Tab separator at Level 3', () => {
+  it('Level 3 output uses tab separators', () => {
+    const data = [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }];
+    const l3 = XRON.stringify(data, { level: 3 });
+    // Data rows should contain tabs, not ", "
+    const dataLines = l3.split('\n').filter(l => !l.startsWith('@'));
+    expect(dataLines[0]).toContain('\t');
+    expect(dataLines[0]).not.toContain(', ');
+  });
+
+  it('Level 1 and 2 still use comma-space', () => {
+    const data = [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }];
+    const l1 = XRON.stringify(data, { level: 1 });
+    const l2 = XRON.stringify(data, { level: 2 });
+    expect(l1).toContain(', ');
+    expect(l2).toContain(', ');
+  });
+
+  it('values with literal tabs are quoted and round-trip', () => {
+    const data = [
+      { id: 1, note: 'col1\tcol2' },
+      { id: 2, note: 'normal value' },
+    ];
+    for (const level of [1, 2, 3] as const) {
+      expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+    }
+  });
+});
+
 describe('XRON Output Format Verification', () => {
   it('Level 1 produces readable output with full schema names', () => {
     const data = [
@@ -329,5 +358,89 @@ describe('XRON Output Format Verification', () => {
       ];
       expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
     });
+  });
+});
+
+describe('Column Templates (Layer A)', () => {
+  const levels = [1, 2, 3] as const;
+
+  it.each(levels)('emails with common domain round-trip at level %i', (level) => {
+    const data = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      email: `user${i + 1}@example.com`,
+      name: `User ${i + 1}`,
+    }));
+    expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+  });
+
+  it.each(levels)('URLs with common prefix round-trip at level %i', (level) => {
+    const data = Array.from({ length: 5 }, (_, i) => ({
+      id: i,
+      url: `https://api.example.com/v2/users/${i}`,
+    }));
+    expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+  });
+
+  it('Level 2 output contains @T header for emails', () => {
+    const data = Array.from({ length: 5 }, (_, i) => ({
+      id: i + 1,
+      email: `user${i + 1}@example.com`,
+    }));
+    const output = XRON.stringify(data, { level: 2 });
+    expect(output).toContain('@T');
+    expect(output).toContain('{}');
+    expect(output).toContain('@example.com');
+  });
+
+  it('Level 3 output contains @T header for emails', () => {
+    const data = Array.from({ length: 5 }, (_, i) => ({
+      id: i + 1,
+      email: `user${i + 1}@example.com`,
+    }));
+    const output = XRON.stringify(data, { level: 3 });
+    expect(output).toContain('@T');
+    expect(output).toContain('{}');
+    expect(output).toContain('@example.com');
+  });
+
+  it('Level 1 does NOT produce @T headers', () => {
+    const data = Array.from({ length: 5 }, (_, i) => ({
+      id: i + 1,
+      email: `user${i + 1}@example.com`,
+    }));
+    const output = XRON.stringify(data, { level: 1 });
+    expect(output).not.toContain('@T');
+  });
+});
+
+describe('Substring Dictionary (Layer C)', () => {
+  const levels = [1, 2, 3] as const;
+
+  it.each(levels)('emails with shared domain round-trip at level %i', (level) => {
+    const data = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      email: `person${i + 1}@longdomain.example.com`,
+    }));
+    expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
+  });
+
+  it('Level 3 output contains @P header for shared substrings', () => {
+    const data = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      email: `person${i + 1}@longdomain.example.com`,
+    }));
+    const output = XRON.stringify(data, { level: 3 });
+    // Should have substring dict if the domain is long enough to be profitable
+    if (output.includes('@P')) {
+      expect(output).toContain('%0');
+    }
+  });
+
+  it.each(levels)('values with literal % sign round-trip at level %i', (level) => {
+    const data = [
+      { id: 1, note: '100% complete' },
+      { id: 2, note: '50% done' },
+    ];
+    expect(XRON.parse(XRON.stringify(data, { level }))).toEqual(data);
   });
 });

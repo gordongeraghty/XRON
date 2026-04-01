@@ -26,6 +26,7 @@ export function encodePositionalRows(
   allSchemas: Map<string, SchemaDefinition>,
   encodeValue: (value: any, schemas: Map<string, SchemaDefinition>) => string,
   level: XronLevel = 2,
+  fieldSep: string = ', ',
 ): string[] {
   const rows: string[] = [];
 
@@ -52,7 +53,7 @@ export function encodePositionalRows(
         values.push(encodeValue(value, allSchemas));
       }
     }
-    rows.push(values.join(', '));
+    rows.push(values.join(fieldSep));
   }
 
   return rows;
@@ -106,9 +107,41 @@ export function decodePositionalRows(
 }
 
 /**
+ * Detect whether a row uses tab separators (at the top level, outside quotes/brackets).
+ */
+function detectTabSeparator(row: string): boolean {
+  let inQuotes = false;
+  let depth = 0;
+  let isEscaped = false;
+
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+
+    if (ch === '\\' && !isEscaped) {
+      isEscaped = true;
+      continue;
+    }
+
+    if (ch === '"' && !isEscaped) {
+      inQuotes = !inQuotes;
+    } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
+      depth++;
+    } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
+      depth--;
+    } else if (ch === '\t' && !inQuotes && depth === 0) {
+      return true;
+    }
+    isEscaped = false;
+  }
+  return false;
+}
+
+/**
  * Split a row into individual values, respecting quoted strings and nested parens.
+ * Auto-detects whether the row uses tab or comma separators.
  */
 export function splitRow(row: string): string[] {
+  const useTab = detectTabSeparator(row);
   const values: string[] = [];
   let current = '';
   let inQuotes = false;
@@ -134,7 +167,7 @@ export function splitRow(row: string): string[] {
     } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
       depth--;
       current += ch;
-    } else if (ch === ',' && !inQuotes && depth === 0) {
+    } else if (useTab ? (ch === '\t' && !inQuotes && depth === 0) : (ch === ',' && !inQuotes && depth === 0)) {
       values.push(current.trim());
       current = '';
     } else {

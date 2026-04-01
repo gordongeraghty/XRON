@@ -28,9 +28,21 @@ import {
   formatSchemaHeader,
   formatDictHeader,
   formatCardinalityHeader,
+  formatTemplateHeader,
+  formatSubstringDictHeader,
 } from './format/header.js';
 import { escapeValue } from './format/escape.js';
-import { getSeparatorConfig } from './pipeline/tokenizer-opt.js';
+import { getSeparatorConfig, getFieldSep } from './pipeline/tokenizer-opt.js';
+import {
+  ColumnTemplate,
+  detectColumnTemplates,
+  applyColumnTemplates,
+} from './pipeline/column-template.js';
+import {
+  SubstringEntry,
+  buildSubstringDictionary,
+  applySubstringRefs,
+} from './pipeline/substring-dict.js';
 
 /**
  * Pre-check for circular references before any processing.
@@ -203,7 +215,8 @@ function encodeArray(
     item && typeof item === 'object' && !Array.isArray(item) &&
     matchSchema(item, schemas)?.signature === firstSchema.signature
   )) {
-    return encodeSchemaArray(arr, firstSchema, schemas, dictLookup, level, opts, seen);
+    const fieldSep = getFieldSep(level, opts.tokenizer);
+    return encodeSchemaArray(arr, firstSchema, schemas, dictLookup, level, opts, seen, fieldSep);
   }
 
   // Mixed or non-schema array — encode as JSON-like inline
@@ -225,12 +238,10 @@ function encodeSchemaArray(
   level: XronLevel,
   opts: Required<XronOptions>,
   seen: WeakSet<object>,
+  fieldSep: string = ', ',
 ): string[] {
   const schemaName = level >= 2 ? schema.name : schema.fullName;
   const lines: string[] = [];
-
-  // Cardinality guard
-  lines.push(formatCardinalityHeader(arr.length, schemaName));
 
   // Encode values positionally — use encodePrimitive for simple values,
   // encodeInlineValue for arrays/objects that aren't nested schemas
@@ -241,27 +252,71 @@ function encodeSchemaArray(
     return encodePrimitive(val, level, dictLookup);
   };
 
-  const rows = encodePositionalRows(arr, schema, schemas, valueEncoder, level);
+  const rows = encodePositionalRows(arr, schema, schemas, valueEncoder, level, fieldSep);
 
-  if (level >= 3 && rows.length >= opts.deltaThreshold) {
-    // Parse rows into 2D array for delta/repeat analysis
-    const parsed2D = rows.map(row => splitRow(row));
+  // Layer A: Column Template Compression (Level 2+)
+  // Template headers must appear BEFORE the @N cardinality guard so the parser
+  // collects them during the header phase.
+  let templateColumns = new Set<number>();
+  let parsed2DForTemplates: string[][] | null = null;
 
-    // Analyze for raw (pre-encoded) data to find delta columns
-    const rawRows = arr.map(item =>
-      schema.fields.map(f => item[f])
-    );
-    const deltaColumns = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold);
+  if (level >= 2 && rows.length >= 2) {
+    // Parse rows into 2D array
+    parsed2DForTemplates = rows.map(row => splitRow(row));
 
-    // Apply delta encoding
-    let processed = applyDeltaEncoding(parsed2D, deltaColumns);
+    const templates = detectColumnTemplates(parsed2DForTemplates);
+    templateColumns = new Set(templates.map(t => t.columnIndex));
 
-    // Apply repeat encoding (skip delta columns)
-    processed = applyRepeatEncoding(processed, deltaColumns);
+    if (templates.length > 0) {
+      // Write template headers BEFORE cardinality guard
+      for (const tmpl of templates) {
+        lines.push(formatTemplateHeader(tmpl));
+      }
+      // Apply templates — strip prefix/suffix from values
+      parsed2DForTemplates = applyColumnTemplates(parsed2DForTemplates, templates);
+    }
+  }
 
-    // Rejoin rows
-    for (const row of processed) {
-      lines.push(row.join(', '));
+  // Layer C: Substring Dictionary Compression (Level 3)
+  // @P header must appear BEFORE the @N cardinality guard so the parser
+  // collects it during the header phase.
+  if (level >= 3 && parsed2DForTemplates) {
+    const substringEntries = buildSubstringDictionary(parsed2DForTemplates);
+    if (substringEntries.length > 0) {
+      lines.push(formatSubstringDictHeader(substringEntries.map(e => e.value)));
+      parsed2DForTemplates = applySubstringRefs(parsed2DForTemplates, substringEntries);
+    }
+  }
+
+  // Cardinality guard
+  lines.push(formatCardinalityHeader(arr.length, schemaName));
+
+  if (level >= 2 && rows.length >= 2 && parsed2DForTemplates) {
+    let parsed2D = parsed2DForTemplates;
+
+    if (level >= 3 && rows.length >= opts.deltaThreshold) {
+      // Analyze for raw (pre-encoded) data to find delta columns
+      const rawRows = arr.map(item =>
+        schema.fields.map(f => item[f])
+      );
+      const deltaColumns = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold)
+        .filter(dc => !templateColumns.has(dc.columnIndex));
+
+      // Apply delta encoding
+      let processed = applyDeltaEncoding(parsed2D, deltaColumns);
+
+      // Apply repeat encoding (skip delta columns)
+      processed = applyRepeatEncoding(processed, deltaColumns);
+
+      // Rejoin rows
+      for (const row of processed) {
+        lines.push(row.join(fieldSep));
+      }
+    } else {
+      // Rejoin rows (with template applied but no delta)
+      for (const row of parsed2D) {
+        lines.push(row.join(fieldSep));
+      }
     }
   } else {
     lines.push(...rows);

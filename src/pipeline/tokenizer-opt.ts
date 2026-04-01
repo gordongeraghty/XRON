@@ -70,6 +70,14 @@ export function getSeparatorConfig(profile: TokenizerProfile): SeparatorConfig {
 }
 
 /**
+ * Get the field separator for a given level and tokenizer profile.
+ * Level 3 uses tab (\t) for 1-char separation; Levels 1-2 keep ', ' for readability.
+ */
+export function getFieldSep(level: number, profile: TokenizerProfile): string {
+  return level >= 3 ? '\t' : SEPARATOR_CONFIGS[profile].fieldSep;
+}
+
+/**
  * Estimate the token count of a string for a given tokenizer.
  * This is a heuristic — use tiktoken for exact counts.
  *

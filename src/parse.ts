@@ -15,6 +15,8 @@ import {
   parseSchemaHeader,
   parseDictHeader,
   parseCardinalityHeader,
+  parseTemplateHeader,
+  parseSubstringDictHeader,
   isHeaderLine,
   getHeaderType,
 } from './format/header.js';
@@ -22,6 +24,8 @@ import { decodeTypedValue } from './pipeline/type-encoding.js';
 import { resolveDictRef, isDictRef } from './pipeline/dictionary.js';
 import { decodeDeltaRows, decodeRepeatRows } from './pipeline/delta.js';
 import { splitRow, findSchemaByName } from './pipeline/positional.js';
+import { ColumnTemplate, expandColumnTemplates } from './pipeline/column-template.js';
+import { SubstringEntry, expandSubstringRefs } from './pipeline/substring-dict.js';
 
 /**
  * Parse an XRON string back to a JavaScript value.
@@ -83,6 +87,8 @@ function parseDocument(input: string): XronDocument {
   const schemas = new Map<string, SchemaDefinition>();
   const schemasByName = new Map<string, SchemaDefinition>();
   let dictionary: string[] = [];
+  let substringDict: string[] = [];
+  const columnTemplates: ColumnTemplate[] = [];
 
   while (lineIdx < lines.length) {
     const line = lines[lineIdx].trim();
@@ -128,6 +134,22 @@ function parseDocument(input: string): XronDocument {
         lineIdx++;
         break;
       }
+      case 'substring-dict': {
+        const values = parseSubstringDictHeader(line);
+        if (values) {
+          substringDict = values;
+        }
+        lineIdx++;
+        break;
+      }
+      case 'template': {
+        const tmpl = parseTemplateHeader(line);
+        if (tmpl) {
+          columnTemplates.push(tmpl);
+        }
+        lineIdx++;
+        break;
+      }
       case 'cardinality': {
         // Don't consume — cardinality headers are part of data
         break;
@@ -142,7 +164,7 @@ function parseDocument(input: string): XronDocument {
 
   // Phase 2: Parse data section
   const remainingLines = lines.slice(lineIdx);
-  const data = parseDataSection(remainingLines, version, schemas, schemasByName, dictionary);
+  const data = parseDataSection(remainingLines, version, schemas, schemasByName, dictionary, columnTemplates, substringDict);
 
   return { version, schemas, dictionary, data };
 }
@@ -156,6 +178,8 @@ function parseDataSection(
   schemas: Map<string, SchemaDefinition>,
   schemasByName: Map<string, SchemaDefinition>,
   dictionary: string[],
+  columnTemplates: ColumnTemplate[] = [],
+  substringDict: string[] = [],
 ): any {
   if (lines.length === 0) return null;
 
@@ -195,7 +219,7 @@ function parseDataSection(
     }
 
     // Decode rows
-    return decodeSchemaRows(dataRows, schema, version, schemas, schemasByName, dictionary);
+    return decodeSchemaRows(dataRows, schema, version, schemas, schemasByName, dictionary, columnTemplates, substringDict);
   }
 
   // Check for empty array/object
@@ -244,6 +268,8 @@ function decodeSchemaRows(
   schemas: Map<string, SchemaDefinition>,
   schemasByName: Map<string, SchemaDefinition>,
   dictionary: string[],
+  columnTemplates: ColumnTemplate[] = [],
+  substringDict: string[] = [],
 ): any[] {
   // Split each row into cells
   let cells = rows.map(row => splitRow(row));
@@ -267,6 +293,19 @@ function decodeSchemaRows(
     if (deltaColumns.size > 0) {
       cells = decodeDeltaRows(cells, deltaColumns);
     }
+  }
+
+  // Layer C: Expand substring dictionary references
+  if (substringDict.length > 0) {
+    const entries: SubstringEntry[] = substringDict.map((value, index) => ({
+      value, index, frequency: 0,
+    }));
+    cells = expandSubstringRefs(cells, entries);
+  }
+
+  // Layer A: Expand column templates
+  if (columnTemplates.length > 0) {
+    cells = expandColumnTemplates(cells, columnTemplates);
   }
 
   // Convert cells back to objects

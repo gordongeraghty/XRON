@@ -6,6 +6,7 @@
  */
 
 import { SchemaDefinition, XronLevel } from '../types.js';
+import { ColumnTemplate } from '../pipeline/column-template.js';
 
 /**
  * Format the version header line.
@@ -114,10 +115,36 @@ export function parseDictHeader(line: string): string[] | null {
 }
 
 /**
+ * Format a substring dictionary header line.
+ * @P: substring1, substring2
+ */
+export function formatSubstringDictHeader(values: string[]): string {
+  if (values.length === 0) return '';
+  // Quote values that contain commas or quotes (same logic as @D dict)
+  const escaped = values.map(v => {
+    if (v.includes(',') || v.includes('"')) {
+      return `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    }
+    return v;
+  });
+  return `@P: ${escaped.join(', ')}`;
+}
+
+/**
+ * Parse a substring dictionary header: "@P: val0, val1"
+ * Reuses the same parsing logic as @D (comma-separated, quote-aware).
+ */
+export function parseSubstringDictHeader(line: string): string[] | null {
+  const match = line.match(/^@P\s*:\s*(.+)$/);
+  if (!match) return null;
+  return parseDictValues(match[1]);
+}
+
+/**
  * Parse comma-separated dictionary values, respecting quoted strings.
  * Handles escaped quotes (\") and backslashes (\\) within quoted values.
  */
-function parseDictValues(input: string): string[] {
+export function parseDictValues(input: string): string[] {
   const values: string[] = [];
   let current = '';
   let inQuotes = false;
@@ -181,10 +208,52 @@ export function isHeaderLine(line: string): boolean {
  */
 export function getHeaderType(
   line: string,
-): 'version' | 'schema' | 'dict' | 'cardinality' | 'unknown' {
+): 'version' | 'schema' | 'dict' | 'cardinality' | 'template' | 'substring-dict' | 'unknown' {
   if (line.startsWith('@v')) return 'version';
   if (line.startsWith('@S')) return 'schema';
   if (line.startsWith('@D')) return 'dict';
+  if (line.startsWith('@P')) return 'substring-dict';
+  if (line.startsWith('@T')) return 'template';
   if (line.startsWith('@N')) return 'cardinality';
   return 'unknown';
+}
+
+/**
+ * Format a column template header line.
+ * @T colIndex: prefix{}suffix
+ */
+export function formatTemplateHeader(template: ColumnTemplate): string {
+  const escapedPrefix = template.prefix.replace(/\{\}/g, '\\{\\}');
+  const escapedSuffix = template.suffix.replace(/\{\}/g, '\\{\\}');
+  return `@T ${template.columnIndex}: ${escapedPrefix}{}${escapedSuffix}`;
+}
+
+/**
+ * Parse a column template header: "@T 2: user{}@example.com"
+ */
+export function parseTemplateHeader(line: string): ColumnTemplate | null {
+  const match = line.match(/^@T\s+(\d+)\s*:\s*(.+)$/);
+  if (!match) return null;
+  const columnIndex = parseInt(match[1], 10);
+  const pattern = match[2];
+
+  // Find the {} placeholder (not escaped \{\})
+  const placeholderIdx = findUnescapedPlaceholder(pattern);
+  if (placeholderIdx === -1) return null;
+
+  const prefix = pattern.slice(0, placeholderIdx).replace(/\\\{\\\}/g, '{}');
+  const suffix = pattern.slice(placeholderIdx + 2).replace(/\\\{\\\}/g, '{}');
+
+  return { columnIndex, prefix, suffix };
+}
+
+function findUnescapedPlaceholder(pattern: string): number {
+  for (let i = 0; i < pattern.length - 1; i++) {
+    if (pattern[i] === '{' && pattern[i + 1] === '}') {
+      // Check it's not escaped
+      if (i > 0 && pattern[i - 1] === '\\') continue;
+      return i;
+    }
+  }
+  return -1;
 }
