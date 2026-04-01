@@ -2,9 +2,9 @@
 
 **Lossless data serialization achieving up to ~80% token reduction for LLM contexts.**
 
-[![npm version](https://img.shields.io/npm/v/@xron-format/xron.svg)](https://www.npmjs.com/package/@xron-format/xron)
+[![npm version](https://img.shields.io/npm/v/xron-format.svg)](https://www.npmjs.com/package/xron-format)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/github/actions/workflow/status/xron-format/xron-javascript/ci.yml?label=tests)](https://github.com/xron-format/xron-javascript/actions)
+[![Tests](https://img.shields.io/github/actions/workflow/status/gordongeraghty/XRON/ci.yml?label=tests)](https://github.com/gordongeraghty/XRON/actions)
 
 ---
 
@@ -41,13 +41,13 @@ The result: `XRON.parse(XRON.stringify(data))` deep-equals the original data, wh
 ### Installation
 
 ```bash
-npm install @xron-format/xron
+npm install xron-format
 ```
 
 ### Basic Usage
 
 ```typescript
-import { XRON } from '@xron-format/xron';
+import { XRON } from 'xron-format';
 
 const data = [
   { id: 1, name: 'Alice', dept: 'Sales' },
@@ -643,7 +643,7 @@ Supports `o200k_base` (GPT-4o/GPT-5), `cl100k_base` (GPT-4/GPT-3.5), and `claude
 Contributions are welcome. To get started:
 
 ```bash
-git clone https://github.com/xron-format/xron-javascript.git
+git clone https://github.com/gordongeraghty/XRON.git
 cd xron-javascript
 npm install
 npm test

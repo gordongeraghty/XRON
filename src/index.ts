@@ -7,7 +7,7 @@
  *
  * @example
  * ```typescript
- * import { XRON } from '@xron-format/xron';
+ * import { XRON } from 'xron-format';
  *
  * const data = [
  *   { id: 1, name: 'Alice', dept: 'Sales' },
@@ -35,7 +35,7 @@
  * // { inputTokens: 85, outputTokens: 28, reduction: 67, ... }
  * ```
  *
- * @module @xron-format/xron
+ * @module xron-format
  */
 
 import { stringify } from './stringify.js';

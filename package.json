@@ -1,5 +1,5 @@
 {
-  "name": "@xron-format/xron",
+  "name": "xron-format",
   "version": "0.1.0",
   "description": "Extensible Reduced Object Notation — lossless data serialization achieving ~80% token reduction for LLM contexts",
   "type": "module",
@@ -62,6 +62,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/xron-format/xron-javascript"
+    "url": "https://github.com/gordongeraghty/XRON"
   }
 }
