@@ -1,0 +1,67 @@
+{
+  "name": "@xron-format/xron",
+  "version": "0.1.0",
+  "description": "Extensible Reduced Object Notation — lossless data serialization achieving ~80% token reduction for LLM contexts",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "vitest bench",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "xron",
+    "toon",
+    "tron",
+    "json",
+    "serialization",
+    "token-reduction",
+    "llm",
+    "ai",
+    "compression",
+    "lossless",
+    "tokenizer",
+    "bpe",
+    "gpt",
+    "claude"
+  ],
+  "author": "Gordon Geraghty",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  },
+  "peerDependencies": {
+    "tiktoken": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "tiktoken": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xron-format/xron-javascript"
+  }
+}

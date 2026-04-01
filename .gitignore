@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.env
+.env.local
+
+# Site build deps (the docs/ output IS committed for GitHub Pages)
+site/node_modules/
