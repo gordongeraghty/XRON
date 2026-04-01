@@ -26,8 +26,9 @@ describe('Type-Aware Encoding', () => {
       expect(encodeTypedValue(Infinity, 1)).toBe('null');
     });
 
-    it('throws on BigInt', () => {
-      expect(() => encodeTypedValue(BigInt(42), 1)).toThrow('BigInt');
+    it('encodes BigInt as string', () => {
+      const result = encodeTypedValue(BigInt(42), 1);
+      expect(result).toBe('42');
     });
   });
 

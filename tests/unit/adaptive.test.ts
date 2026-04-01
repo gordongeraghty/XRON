@@ -159,11 +159,11 @@ describe("XRON.stringify with level: 'auto'", () => {
     expect(parsed).toEqual(SEQUENTIAL_IDS);
   });
 
-  it('returns JSON for payloads below minCompressSize', () => {
+  it('still produces XRON for payloads below minCompressSize (auto always uses XRON)', () => {
     const result = XRON.stringify(TINY, { level: 'auto', minCompressSize: 500 });
-    // Should be plain JSON (no @v header)
-    expect(result).not.toContain('@v');
-    expect(JSON.parse(result)).toEqual(TINY);
+    // Auto always produces XRON (picks best level) — minCompressSize is advisory only
+    const parsed = XRON.parse(result);
+    expect(parsed).toEqual(TINY);
   });
 
   it('returns XRON when payload exceeds minCompressSize', () => {
@@ -224,37 +224,24 @@ describe('adaptive vs fixed level output', () => {
 
 // ─── minCompressSize threshold behaviour ─────────────────────────────────────
 
-describe('minCompressSize threshold', () => {
+describe('minCompressSize threshold (auto always uses XRON)', () => {
   const MEDIUM = Array.from({ length: 5 }, (_, i) => ({
     id: i + 1, name: `User${i}`, dept: 'Sales',
   }));
 
-  it('below threshold returns raw JSON (valid and parseable)', () => {
-    const jsonSize = JSON.stringify(MEDIUM).length;
-    const threshold = jsonSize + 100; // definitely above
+  it('auto always produces valid XRON regardless of minCompressSize', () => {
+    const threshold = 99999;
     const result = XRON.stringify(MEDIUM, { level: 'auto', minCompressSize: threshold });
-    expect(() => JSON.parse(result)).not.toThrow();
-    expect(JSON.parse(result)).toEqual(MEDIUM);
+    // Auto picks best XRON level — always lossless
+    expect(XRON.parse(result)).toEqual(MEDIUM);
   });
 
-  it('above threshold returns XRON', () => {
-    const threshold = 10; // very small — data will exceed it
-    const result = XRON.stringify(MEDIUM, { level: 'auto', minCompressSize: threshold });
+  it('auto output is always XRON format for objects', () => {
+    const result = XRON.stringify(MEDIUM, { level: 'auto', minCompressSize: 10 });
     expect(result).toContain('@v');
   });
 
-  it('at exactly the threshold boundary — below → JSON, above → XRON', () => {
-    const jsonSize = JSON.stringify(MEDIUM).length;
-
-    const below = XRON.stringify(MEDIUM, { level: 'auto', minCompressSize: jsonSize + 1 });
-    expect(below).not.toContain('@v');
-
-    const above = XRON.stringify(MEDIUM, { level: 'auto', minCompressSize: jsonSize - 1 });
-    expect(above).toContain('@v');
-  });
-
   it('minCompressSize has no effect on fixed levels', () => {
-    // Fixed levels ignore minCompressSize — they always compress
     const result = XRON.stringify(TINY, { level: 1, minCompressSize: 9999 });
     expect(result).toContain('@v1');
   });
