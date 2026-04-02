@@ -1,10 +1,15 @@
 node_modules/
 dist/
+.claude/
+.gemini/
+testsprite_tests/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
 .env
 .env.local
 
-# Site build deps (the docs/ output IS committed for GitHub Pages)
+# Build outputs
+packages/*/dist/
+packages/*/node_modules/
 site/node_modules/
