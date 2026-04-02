@@ -8,6 +8,17 @@
 
 ---
 
+## The XRON Ecosystem
+
+| Package | Purpose | Installation |
+|---------|---------|--------------|
+| [`xron-format`](packages/format) | Core serialization library | `npm install xron-format` |
+| [`xron-mcp`](packages/mcp) | Automatic MCP compression proxy | `npm install -g xron-mcp` |
+| [`xron-cli`](packages/cli) | CLI tool for file-level compression | `npm install -g xron-cli` |
+| [`xron-skill`](packages/skill) | Agent skill for AI assistants | (Integrated with Antigravity) |
+
+---
+
 ## The Problem: JSON's Token Tax
 
 Every time you send structured data to an LLM, JSON imposes significant token overhead:
@@ -55,7 +66,14 @@ Because XRON targets LLMs, a common concern is the "hallucination" of data durin
 ### Installation
 
 ```bash
+# To use the library in your code:
 npm install xron-format
+
+# To use the CLI tool:
+npm install -g xron-cli
+
+# To use the MCP compression proxy:
+npm install -g xron-mcp
 ```
 
 ### Basic Usage
