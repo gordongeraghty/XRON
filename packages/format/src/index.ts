@@ -49,7 +49,7 @@ import {
   DEFAULT_OPTIONS,
 } from './types.js';
 import { estimateTokenCount } from './utils/token-counter.js';
-import { assessData, XronRecommendation } from './pipeline/adaptive.js';
+import { assessData, assessDataExact, XronRecommendation } from './pipeline/adaptive.js';
 
 /**
  * Analyze compression metrics for a given data value.

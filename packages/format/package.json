@@ -1,6 +1,6 @@
 {
   "name": "xron-format",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "homepage": "https://gordongeraghty.github.io/XRON/",
   "description": "Extensible Reduced Object Notation — lossless data serialization achieving ~80% token reduction for LLM contexts",
   "type": "module",

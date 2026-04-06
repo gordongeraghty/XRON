@@ -22,6 +22,9 @@ interface ValueFrequency {
  * Build a dictionary from all string values in the dataset.
  * Returns entries sorted by savings potential (frequency × length) descending.
  */
+/** Maximum base-62 dictionary entries: 62 single-char + 62×62 two-char */
+const MAX_BASE62_ENTRIES = 62 + 62 * 62; // 3906
+
 export function buildDictionary(
   data: any,
   options: {
@@ -53,8 +56,10 @@ export function buildDictionary(
   });
 
   // Take top N entries — include if net token savings are positive
+  // Clamp to base-62 maximum (3906 entries)
+  const effectiveMax = Math.min(options.maxSize, MAX_BASE62_ENTRIES);
   const entries: DictionaryEntry[] = [];
-  for (let i = 0; i < Math.min(candidates.length, options.maxSize); i++) {
+  for (let i = 0; i < Math.min(candidates.length, effectiveMax); i++) {
     const c = candidates[i];
     const savings = estimateTokenSavings(c.value);
     // Cost: 1 dictionary header entry (value listed once in @D)
@@ -114,22 +119,59 @@ function estimateTokenCount(value: string): number {
 
 /**
  * Estimate how many tokens we save by replacing this value with a $ref.
- * $ref costs 1 token ($0-$9) or 2 tokens ($10-$255).
+ * Single-char refs ($0-$Z, indices 0-61) cost ~1 token.
+ * Two-char refs ($00-$ZZ, indices 62+) cost ~1.5 tokens.
  */
 function estimateTokenSavings(value: string): number {
   const valueCost = estimateTokenCount(value);
-  // $ref is typically 1 token for $0-$9, might be 1-2 for higher indices
+  // Conservative estimate: 1 token for most refs
   const refCost = 1;
   return Math.max(0, valueCost - refCost);
 }
 
+// Base-62 alphabet for compact dictionary references
+const B62 = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
 /**
- * Create a lookup map from value → $index reference string.
+ * Encode a dictionary index as a compact base-62 reference string.
+ * Indices 0-61:   single char ($0 - $Z)
+ * Indices 62-3843: two chars ($00 - $ZZ)
+ * Backwards compatible: $0-$9 are the same as old numeric encoding.
+ */
+function encodeDictIndex(index: number): string {
+  if (index < 62) {
+    return B62[index];
+  }
+  const adjusted = index - 62;
+  const hi = Math.floor(adjusted / 62);
+  const lo = adjusted % 62;
+  return B62[hi] + B62[lo];
+}
+
+/**
+ * Decode a base-62 dictionary reference back to a numeric index.
+ */
+function decodeDictIndex(ref: string): number {
+  if (ref.length === 1) {
+    return B62.indexOf(ref);
+  }
+  if (ref.length === 2) {
+    const hi = B62.indexOf(ref[0]);
+    const lo = B62.indexOf(ref[1]);
+    if (hi === -1 || lo === -1) return -1;
+    return 62 + hi * 62 + lo;
+  }
+  return -1;
+}
+
+/**
+ * Create a lookup map from value → $ref reference string.
+ * Uses base-62 encoding for compact refs beyond 62 entries.
  */
 export function createDictLookup(entries: DictionaryEntry[]): Map<string, string> {
   const lookup = new Map<string, string>();
   for (const entry of entries) {
-    lookup.set(entry.value, `$${entry.index}`);
+    lookup.set(entry.value, `$${encodeDictIndex(entry.index)}`);
   }
   return lookup;
 }
@@ -146,12 +188,24 @@ export function createDictReverse(values: string[]): Map<number, string> {
 }
 
 /**
- * Resolve a $index reference to its dictionary value.
+ * Resolve a $ref reference to its dictionary value.
+ * Supports both legacy numeric ($0, $123) and base-62 ($a, $Z, $aB) formats.
  */
 export function resolveDictRef(ref: string, dictionary: string[]): string | null {
-  const match = ref.match(/^\$(\d+)$/);
-  if (!match) return null;
-  const index = parseInt(match[1], 10);
+  if (!ref.startsWith('$') || ref.length < 2) return null;
+  const body = ref.slice(1);
+
+  // Try legacy numeric format first (backwards compatibility)
+  if (/^\d+$/.test(body)) {
+    const index = parseInt(body, 10);
+    if (index >= 0 && index < dictionary.length) {
+      return dictionary[index];
+    }
+    // Fall through to base-62 decode (e.g. $0 is both numeric 0 and b62 index 0)
+  }
+
+  // Base-62 decode
+  const index = decodeDictIndex(body);
   if (index >= 0 && index < dictionary.length) {
     return dictionary[index];
   }
@@ -159,8 +213,15 @@ export function resolveDictRef(ref: string, dictionary: string[]): string | null
 }
 
 /**
- * Check if a value is a dictionary reference ($N).
+ * Check if a value is a dictionary reference ($ref).
+ * Matches legacy numeric ($0-$255+) and base-62 ($a, $Z, $aB, etc.).
  */
 export function isDictRef(value: string): boolean {
-  return /^\$\d+$/.test(value);
+  if (!value.startsWith('$') || value.length < 2) return false;
+  const body = value.slice(1);
+  // Legacy numeric (any length of digits)
+  if (/^\d+$/.test(body)) return true;
+  // Base-62: 1-2 chars from B62 alphabet
+  if (body.length > 2) return false;
+  return body.split('').every(ch => B62.includes(ch));
 }

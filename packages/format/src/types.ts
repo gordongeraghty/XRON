@@ -33,7 +33,7 @@ export interface XronOptions {
   tokenizer?: TokenizerProfile;
   /** Indentation width for Level 1 nested objects. Default: 2 */
   indent?: number;
-  /** Maximum dictionary entries for Level 2+. Default: 256 */
+  /** Maximum dictionary entries for Level 2+. Default: 1024. Max supported: 3906 (base-62). */
   maxDictSize?: number;
   /** Minimum occurrences to enable delta encoding. Default: 3 */
   deltaThreshold?: number;
@@ -57,6 +57,12 @@ export interface XronOptions {
    * Default: `64`
    */
   maxDepth?: number;
+  /**
+   * When `true`, throw an `Error` on data integrity issues (checksum mismatch,
+   * cardinality mismatch, anonymous array row count mismatch).
+   * When `false` (default), log a `console.warn` and continue parsing.
+   */
+  strictValidation?: boolean;
 }
 
 /** Analysis result showing compression metrics */
@@ -181,10 +187,11 @@ export const DEFAULT_OPTIONS: Required<XronOptions> = {
   level: 2,
   tokenizer: 'o200k_base',
   indent: 2,
-  maxDictSize: 256,
+  maxDictSize: 1024,
   deltaThreshold: 3,
   minDictValueLength: 2,
   minDictFrequency: 2,
   minCompressSize: 0,
   maxDepth: 64,
+  strictValidation: false,
 };

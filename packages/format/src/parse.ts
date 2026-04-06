@@ -17,11 +17,14 @@ import {
   parseSchemaHeader,
   parseDictHeader,
   parseCardinalityHeader,
+  parseAnonymousArrayHeader,
   parseTemplateHeader,
   parseSubstringDictHeader,
+  parseChecksumHeader,
   isHeaderLine,
   getHeaderType,
 } from './format/header.js';
+import { crc32Hex } from './utils/crc32.js';
 import { decodeTypedValue, expandDate } from './pipeline/type-encoding.js';
 import { resolveDictRef, isDictRef } from './pipeline/dictionary.js';
 import { decodeDeltaRows, decodeRepeatRows } from './pipeline/delta.js';
@@ -92,14 +95,24 @@ export function parse(input: string, options?: XronOptions): any {
   }
 
   // Parse the XRON document
-  const doc = parseDocument(trimmed);
+  const doc = parseDocument(trimmed, opts.strictValidation);
   return doc.data;
+}
+
+/**
+ * Report a validation issue — throws in strict mode, warns otherwise.
+ */
+function validationIssue(message: string, strict: boolean): void {
+  if (strict) {
+    throw new Error(message);
+  }
+  console.warn(message);
 }
 
 /**
  * Parse a full XRON document (headers + data).
  */
-function parseDocument(input: string): XronDocument {
+function parseDocument(input: string, strict = false): XronDocument {
   const lines = input.split('\n');
   let lineIdx = 0;
 
@@ -128,6 +141,23 @@ function parseDocument(input: string): XronDocument {
       case 'version': {
         const v = parseVersionHeader(line);
         if (v !== null) version = v;
+        lineIdx++;
+        break;
+      }
+      case 'checksum': {
+        const expectedHex = parseChecksumHeader(line);
+        if (expectedHex) {
+          // Verify: rebuild the payload without the @C line, then CRC32 it
+          const payloadWithout = lines.filter((_, i) => i !== lineIdx).join('\n');
+          const actualHex = crc32Hex(payloadWithout);
+          if (actualHex !== expectedHex) {
+            validationIssue(
+              `XRON: Checksum mismatch — expected ${expectedHex}, got ${actualHex}. ` +
+              `Data may be truncated or corrupted.`,
+              strict,
+            );
+          }
+        }
         lineIdx++;
         break;
       }
@@ -175,17 +205,21 @@ function parseDocument(input: string): XronDocument {
         // Don't consume — cardinality headers are part of data
         break;
       }
+      case 'anonymous-array': {
+        // Don't consume — anonymous array headers are part of data
+        break;
+      }
       default:
         lineIdx++;
         break;
     }
 
-    if (headerType === 'cardinality') break;
+    if (headerType === 'cardinality' || headerType === 'anonymous-array') break;
   }
 
   // Phase 2: Parse data section
   const remainingLines = lines.slice(lineIdx);
-  const data = parseDataSection(remainingLines, version, schemas, schemasByName, dictionary, columnTemplates, substringDict);
+  const data = parseDataSection(remainingLines, version, schemas, schemasByName, dictionary, columnTemplates, substringDict, strict);
 
   return { version, schemas, dictionary, data };
 }
@@ -201,6 +235,7 @@ function parseDataSection(
   dictionary: string[],
   columnTemplates: ColumnTemplate[] = [],
   substringDict: string[] = [],
+  strict = false,
 ): any {
   if (lines.length === 0) return null;
 
@@ -211,6 +246,39 @@ function parseDataSection(
   if (lineIdx >= lines.length) return null;
 
   const firstLine = lines[lineIdx].trim();
+
+  // Check for anonymous 2D array header: @A 5 3
+  const anonArray = parseAnonymousArrayHeader(firstLine);
+  if (anonArray) {
+    lineIdx++;
+    const dataRows: string[] = [];
+    while (lineIdx < lines.length) {
+      const line = lines[lineIdx];
+      if (line.trim() === '' || isHeaderLine(line.trim())) break;
+      dataRows.push(line.trim());
+      lineIdx++;
+    }
+
+    if (dataRows.length !== anonArray.rowCount) {
+      validationIssue(
+        `XRON: Expected ${anonArray.rowCount} rows for anonymous array, got ${dataRows.length}`,
+        strict,
+      );
+    }
+
+    // Decode rows into arrays of values
+    let cells = dataRows.map(row => splitRow(row));
+
+    // Decode repeat markers (~)
+    if (version >= 3) {
+      cells = decodeRepeatRows(cells);
+    }
+
+    // Convert cells back to arrays of decoded values
+    return cells.map(row =>
+      row.map(cell => decodeRawValue(cell.trim(), version, dictionary))
+    );
+  }
 
   // Check for cardinality header: @N5 SchemaName
   const cardinality = parseCardinalityHeader(firstLine);
@@ -232,10 +300,10 @@ function parseDataSection(
 
     // Validate cardinality
     if (dataRows.length !== cardinality.count) {
-      // Soft warning — still parse what we have
-      console.warn(
+      validationIssue(
         `XRON: Expected ${cardinality.count} rows for schema ${cardinality.schemaName}, ` +
-        `got ${dataRows.length}`
+        `got ${dataRows.length}`,
+        strict,
       );
     }
 
@@ -314,11 +382,16 @@ function decodeSchemaRows(
 
     // Detect delta columns (columns where values start with +/-)
     const deltaColumns = new Set<number>();
+    const temporalColumns = new Set<number>();
     for (let col = 0; col < (cells[0]?.length ?? 0); col++) {
       for (let row = 1; row < cells.length; row++) {
         const val = cells[row][col];
         if (val.startsWith('+') || (val.startsWith('-') && val.length > 1 && /^\-\d/.test(val))) {
           deltaColumns.add(col);
+          // Detect temporal deltas (end with 's' for seconds)
+          if (val.endsWith('s')) {
+            temporalColumns.add(col);
+          }
           break;
         }
       }
@@ -330,7 +403,12 @@ function decodeSchemaRows(
       for (let col = 0; col < schema.fields.length; col++) {
         if (schema.fieldTypes.get(col) === 'bigint') bigintColumns.add(col);
       }
-      cells = decodeDeltaRows(cells, deltaColumns, bigintColumns.size > 0 ? bigintColumns : undefined);
+      cells = decodeDeltaRows(
+        cells,
+        deltaColumns,
+        bigintColumns.size > 0 ? bigintColumns : undefined,
+        temporalColumns.size > 0 ? temporalColumns : undefined,
+      );
     }
   }
 

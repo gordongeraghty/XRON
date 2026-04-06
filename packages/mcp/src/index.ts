@@ -18,7 +18,7 @@ import {
 import { XRON } from "xron-format";
 
 const FORMAT_HINT =
-  "[XRON compressed — tabular format, $ = dictionary ref, + = delta]";
+  "[XRON compressed — tabular format, $ = dictionary ref (base-62), + = delta, +Ns = temporal delta, @C = checksum, @A = 2D array, ~ = repeat]";
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing

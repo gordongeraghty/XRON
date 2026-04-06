@@ -186,6 +186,28 @@ export function parseDictValues(input: string): string[] {
 }
 
 /**
+ * Format an anonymous 2D array header line.
+ * @A 5 3   (5 rows, 3 columns)
+ */
+export function formatAnonymousArrayHeader(rowCount: number, colCount: number): string {
+  return `@A ${rowCount} ${colCount}`;
+}
+
+/**
+ * Parse an anonymous array header: "@A 5 3" → { rowCount: 5, colCount: 3 }
+ */
+export function parseAnonymousArrayHeader(
+  line: string,
+): { rowCount: number; colCount: number } | null {
+  const match = line.match(/^@A\s+(\d+)\s+(\d+)$/);
+  if (!match) return null;
+  return {
+    rowCount: parseInt(match[1], 10),
+    colCount: parseInt(match[2], 10),
+  };
+}
+
+/**
  * Parse a cardinality header: "@N5 User" → { count: 5, schemaName: "User" }
  */
 export function parseCardinalityHeader(
@@ -207,16 +229,34 @@ export function isHeaderLine(line: string): boolean {
 }
 
 /**
+ * Format a checksum header line.
+ * @C a1b2c3d4
+ */
+export function formatChecksumHeader(hex: string): string {
+  return `@C ${hex}`;
+}
+
+/**
+ * Parse a checksum header: "@C a1b2c3d4" → "a1b2c3d4"
+ */
+export function parseChecksumHeader(line: string): string | null {
+  const match = line.match(/^@C\s+([0-9a-f]{8})$/);
+  return match ? match[1] : null;
+}
+
+/**
  * Determine the type of header directive.
  */
 export function getHeaderType(
   line: string,
-): 'version' | 'schema' | 'dict' | 'cardinality' | 'template' | 'substring-dict' | 'unknown' {
+): 'version' | 'schema' | 'dict' | 'cardinality' | 'template' | 'substring-dict' | 'checksum' | 'anonymous-array' | 'unknown' {
   if (line.startsWith('@v')) return 'version';
+  if (line.startsWith('@C')) return 'checksum';
   if (line.startsWith('@S')) return 'schema';
   if (line.startsWith('@D')) return 'dict';
   if (line.startsWith('@P')) return 'substring-dict';
   if (line.startsWith('@T')) return 'template';
+  if (line.startsWith('@A')) return 'anonymous-array';
   if (line.startsWith('@N')) return 'cardinality';
   return 'unknown';
 }

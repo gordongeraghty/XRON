@@ -23,6 +23,7 @@
 import { XronLevel, XronOptions, SchemaDefinition, DEFAULT_OPTIONS } from '../types.js';
 import { extractSchemas } from './schema.js';
 import { buildDictionary } from './dictionary.js';
+import { estimateTokens, countTokensExact } from './tokenizer-opt.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -297,7 +298,10 @@ function estimateDeltaSavings(data: any): number {
   return Math.floor(data.length * 2);
 }
 
-/** Lightweight check: are there any monotonically sequential numeric columns? */
+// ISO date string pattern for delta potential detection
+const ISO_DATE_RE_ADAPTIVE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/** Lightweight check: are there any monotonically sequential numeric or temporal columns? */
 function detectDeltaPotential(
   data: any,
   schemas: Map<string, SchemaDefinition>,
@@ -305,11 +309,11 @@ function detectDeltaPotential(
 ): boolean {
   if (!Array.isArray(data) || data.length < deltaThreshold) return false;
 
-  // Check the first schema's fields for sequential numbers
+  // Check the first schema's fields for sequential numbers or dates
   for (const schema of schemas.values()) {
     if (schema.frequency < deltaThreshold) continue;
 
-    // Sample first `deltaThreshold` items that match this schema
+    // Sample items that match this schema
     const sample = data
       .filter((item): item is Record<string, unknown> =>
         item !== null && typeof item === 'object' && !Array.isArray(item))
@@ -317,20 +321,66 @@ function detectDeltaPotential(
 
     for (let fi = 0; fi < schema.fields.length; fi++) {
       const field = schema.fields[fi];
-      const vals = sample
+
+      // Check numeric sequential
+      const numVals = sample
         .map(item => item[field])
         .filter(v => typeof v === 'number' && isFinite(v as number)) as number[];
 
-      if (vals.length < deltaThreshold) continue;
+      if (numVals.length >= deltaThreshold) {
+        const deltas = numVals.slice(1).map((v, i) => v - numVals[i]);
+        if (deltas.length > 0 && deltas.every(d => d === deltas[0])) {
+          return true;
+        }
+      }
 
-      // Check if differences are constant
-      const deltas = vals.slice(1).map((v, i) => v - vals[i]);
-      if (deltas.length > 0 && deltas.every(d => d === deltas[0])) {
-        return true;
+      // Check temporal sequential (ISO date strings)
+      const dateVals = sample
+        .map(item => item[field])
+        .filter(v => typeof v === 'string' && ISO_DATE_RE_ADAPTIVE.test(v as string)) as string[];
+
+      if (dateVals.length >= deltaThreshold) {
+        const epochs = dateVals.map(v => new Date(v).getTime());
+        if (epochs.every(e => !isNaN(e))) {
+          const deltas = epochs.slice(1).map((v, i) => v - epochs[i]);
+          if (deltas.length > 0 && deltas.every(d => d === deltas[0])) {
+            return true;
+          }
+        }
       }
     }
   }
   return false;
+}
+
+/**
+ * Async version of assessData that uses tiktoken for exact token counts
+ * when available. Falls back to heuristic estimation otherwise.
+ *
+ * Use this for CLI analysis with --exact-tokens or when precision matters.
+ */
+export async function assessDataExact(
+  data: any,
+  options?: Partial<XronOptions>,
+): Promise<XronRecommendation> {
+  // Try to get exact token counts via tiktoken
+  const profile = options?.tokenizer ?? DEFAULT_OPTIONS.tokenizer;
+  const jsonStr = JSON.stringify(data);
+
+  try {
+    const exactTokens = await countTokensExact(jsonStr, profile);
+    // If countTokensExact succeeded (didn't fall back to heuristic),
+    // we have exact counts. Use the sync path but note accuracy.
+    const rec = assessData(data, options);
+    rec.caveats = rec.caveats.map(c =>
+      c.includes('heuristic')
+        ? c.replace('heuristic (char-based)', 'tiktoken (exact)')
+        : c
+    );
+    return rec;
+  } catch {
+    return assessData(data, options);
+  }
 }
 
 /** Build context-appropriate caveats for the recommendation. */

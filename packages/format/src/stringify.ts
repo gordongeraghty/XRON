@@ -25,12 +25,15 @@ import {
 } from './pipeline/delta.js';
 import {
   formatVersionHeader,
+  formatChecksumHeader,
   formatSchemaHeader,
   formatDictHeader,
   formatCardinalityHeader,
+  formatAnonymousArrayHeader,
   formatTemplateHeader,
   formatSubstringDictHeader,
 } from './format/header.js';
+import { crc32Hex } from './utils/crc32.js';
 import { escapeValue } from './format/escape.js';
 import { getSeparatorConfig, getFieldSep } from './pipeline/tokenizer-opt.js';
 import {
@@ -43,6 +46,17 @@ import {
   buildSubstringDictionary,
   applySubstringRefs,
 } from './pipeline/substring-dict.js';
+
+/**
+ * Recursively check whether a value contains any BigInt leaves.
+ * Used by auto mode to avoid JSON fallback (which loses BigInt type info).
+ */
+function containsBigInt(value: any): boolean {
+  if (typeof value === 'bigint') return true;
+  if (value === null || value === undefined || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(containsBigInt);
+  return Object.values(value).some(containsBigInt);
+}
 
 /**
  * Pre-check for circular references before any processing.
@@ -81,16 +95,15 @@ export function stringify(value: any, options?: XronOptions): string {
       return stringify(value, { ...opts, level: 1 });
     }
 
-    const jsonStr = JSON.stringify(value, (_, v) => typeof v === 'bigint' ? v.toString() : v);
-    const minSize = opts.minCompressSize ?? 0;
-    
-    // Only return raw JSON if explicitly configured for tiny payloads AND it contains no BigInts
-    if (minSize > 0 && jsonStr.length < minSize && !jsonStr.includes('"')) {
-      // Actually, removing JSON fallback entirely guarantees native type retention.
-    }
+    // JSON.stringify loses BigInt type info, so only use it as a candidate
+    // when the data contains no BigInts (preserving losslessness).
+    const hasBigInt = containsBigInt(value);
+    const jsonStr = hasBigInt
+      ? null
+      : JSON.stringify(value);
 
-    // Try all levels and pick the shortest output
-    let bestOutput: string | null = null;
+    // Try all XRON levels and pick the shortest output
+    let bestOutput: string | null = jsonStr;
     for (const lvl of [1, 2, 3] as const) {
       try {
         const candidate = stringify(value, { ...opts, level: lvl });
@@ -101,6 +114,7 @@ export function stringify(value: any, options?: XronOptions): string {
         // If a level fails, skip it
       }
     }
+    // Never-Worse Guarantee: return raw JSON if no XRON level beats it
     return bestOutput!;
   }
 
@@ -154,7 +168,21 @@ export function stringify(value: any, options?: XronOptions): string {
   const dataLines = encodeData(value, schemas, dictLookup, level, opts, seen, 0);
   lines.push(...dataLines);
 
-  return lines.join(sepConfig.rowSep);
+  // Build output without checksum, then insert @C after the version header
+  const payload = lines.join(sepConfig.rowSep);
+  const checksum = crc32Hex(payload);
+  // Insert @C line after @v line (first line)
+  const firstNewline = payload.indexOf('\n');
+  if (firstNewline === -1) {
+    // Single-line output (unlikely for non-primitives) — append checksum
+    return payload + sepConfig.rowSep + formatChecksumHeader(checksum);
+  }
+  const withChecksum =
+    payload.slice(0, firstNewline) +
+    sepConfig.rowSep +
+    formatChecksumHeader(checksum) +
+    payload.slice(firstNewline);
+  return withChecksum;
 }
 
 /**
@@ -200,6 +228,7 @@ function encodeData(
 /**
  * Encode an array value.
  * If all items share the same schema → positional streaming with cardinality guard.
+ * If all items are arrays of the same length → anonymous 2D array encoding.
  * Otherwise → inline encoding.
  */
 function encodeArray(
@@ -226,12 +255,72 @@ function encodeArray(
     return encodeSchemaArray(arr, firstSchema, schemas, dictLookup, level, opts, seen, fieldSep);
   }
 
+  // Check for 2D array: all items are arrays of the same length
+  if (Array.isArray(arr[0]) && arr[0].length > 0) {
+    const colCount = arr[0].length;
+    const isUniform2D = arr.every(
+      item => Array.isArray(item) && item.length === colCount
+    );
+
+    if (isUniform2D && arr.length >= 2) {
+      return encode2DArray(arr, colCount, dictLookup, level, opts, seen);
+    }
+  }
+
   // Mixed or non-schema array — encode as JSON-like inline
   const items: string[] = [];
   for (const item of arr) {
     items.push(encodeInlineValue(item, level, dictLookup, seen));
   }
   return [`[${items.join(', ')}]`];
+}
+
+/**
+ * Encode a uniform 2D array (array of same-length arrays) using anonymous positional streaming.
+ */
+function encode2DArray(
+  arr: any[][],
+  colCount: number,
+  dictLookup: Map<string, string>,
+  level: XronLevel,
+  opts: Required<XronOptions>,
+  seen: WeakSet<object>,
+): string[] {
+  const fieldSep = getFieldSep(level, opts.tokenizer);
+  const lines: string[] = [];
+
+  // Encode each inner array as a row of values
+  // Use encodeInlineValue for non-primitives (objects, arrays) to preserve structure
+  const rows: string[][] = arr.map(innerArr =>
+    innerArr.map(val => {
+      if (val !== null && typeof val === 'object') {
+        return encodeInlineValue(val, level, dictLookup, seen);
+      }
+      return encodePrimitive(val, level, dictLookup);
+    })
+  );
+
+  // Apply dictionary-based compression at Level 2+
+  if (level >= 2 && rows.length >= 2) {
+    // Apply repeat encoding (same-as-previous ~)
+    let compressed = rows;
+    if (level >= 3) {
+      // Skip delta for now on anonymous arrays — no schema type hints
+      compressed = applyRepeatEncoding(compressed, []);
+    }
+
+    lines.push(formatAnonymousArrayHeader(arr.length, colCount));
+    for (const row of compressed) {
+      lines.push(row.join(fieldSep));
+    }
+  } else {
+    lines.push(formatAnonymousArrayHeader(arr.length, colCount));
+    for (const row of rows) {
+      lines.push(row.join(fieldSep));
+    }
+  }
+
+  return lines;
 }
 
 /**
