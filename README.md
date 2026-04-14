@@ -1,21 +1,34 @@
-# XRON: Extensible Reduced Object Notation
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/XRON-000000?style=for-the-badge&labelColor=333333" />
+    <img src="https://img.shields.io/badge/XRON-000000?style=for-the-badge&labelColor=333333" alt="XRON" />
+  </picture>
+</p>
 
-**Lossless data serialization achieving up to ~80% token reduction for LLM contexts.**
+<h3 align="center">Extensible Reduced Object Notation</h3>
 
-[![npm version](https://img.shields.io/npm/v/xron-format.svg)](https://www.npmjs.com/package/xron-format)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/github/actions/workflow/status/gordongeraghty/XRON/ci.yml?label=tests)](https://github.com/gordongeraghty/XRON/actions)
+<p align="center">
+  Lossless data serialisation achieving up to ~80% token reduction for LLM contexts.<br/>
+  Drop-in JSON replacement. Zero hallucination. Production-ready.
+</p>
 
----
+<p align="center">
+  <a href="https://www.npmjs.com/package/xron-format"><img src="https://img.shields.io/npm/v/xron-format.svg?style=flat-square" alt="npm version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT Licence" /></a>
+  <a href="https://github.com/gordongeraghty/XRON/actions"><img src="https://img.shields.io/github/actions/workflow/status/gordongeraghty/XRON/ci.yml?label=tests&style=flat-square" alt="Tests" /></a>
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Node.js-22+-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" />
+</p>
 
-## The XRON Ecosystem
-
-| Package | Purpose | Installation |
-|---------|---------|--------------|
-| [`xron-format`](packages/format) | Core serialization library | `npm install xron-format` |
-| [`xron-mcp`](packages/mcp) | Automatic MCP compression proxy | `npm install -g xron-mcp` |
-| [`xron-cli`](packages/cli) | CLI tool for file-level compression | `npm install -g xron-cli` |
-| [`xron-skill`](packages/skill) | Agent skill for AI assistants | (Integrated with Antigravity) |
+<p align="center">
+  <a href="#the-problem-jsons-token-tax">Problem</a> &middot;
+  <a href="#the-xron-ecosystem">Ecosystem</a> &middot;
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="#compression-levels">Levels</a> &middot;
+  <a href="#api-reference">API</a> &middot;
+  <a href="#benchmarks--format-comparison">Benchmarks</a> &middot;
+  <a href="#contributing">Contributing</a>
+</p>
 
 ---
 
@@ -32,7 +45,7 @@ For a typical 500-user dataset, JSON consumes **~4,200 tokens**. At $15/MTok (GP
 
 ## The Solution: XRON's 9-Layer Compression Pipeline
 
-XRON is a lossless serialization format purpose-built for LLM token efficiency. It applies nine progressive compression layers:
+XRON is a lossless serialisation format purpose-built for LLM token efficiency. It applies nine progressive compression layers:
 
 | Layer | Technique | What It Eliminates |
 |-------|-----------|-------------------|
@@ -44,19 +57,31 @@ XRON is a lossless serialization format purpose-built for LLM token efficiency. 
 | L6 | Substring dictionary | Repeated substrings across unique values |
 | L7 | Delta + repeat compression | Sequential numbers, repeated values |
 | L8 | Separator reduction | Field separator overhead (tab vs comma-space) |
-| L9 | Tokenizer alignment | Suboptimal BPE token boundaries |
+| L9 | Tokeniser alignment | Suboptimal BPE token boundaries |
 
-The result: `XRON.parse(XRON.stringify(data))` deep-equals the original data, while using 60-80% fewer tokens.
+The result: `XRON.parse(XRON.stringify(data))` deep-equals the original data, while using 60--80% fewer tokens.
 
 ---
 
-## 🛡️ Zero-Hallucination & Lossless Guarantee
+## The XRON Ecosystem
 
-Because XRON targets LLMs, a common concern is the "hallucination" of data during compression or decompression. 
+| Package | Purpose | Installation |
+|---------|---------|--------------|
+| [`xron-format`](packages/format) | Core serialisation library | `npm install xron-format` |
+| [`xron-mcp`](packages/mcp) | Automatic MCP compression proxy | `npm install -g xron-mcp` |
+| [`xron-cli`](packages/cli) | CLI tool for file-level compression | `npm install -g xron-cli` |
+| [`xron-skill`](packages/skill) | Agent skill for AI assistants | (Integrated with Antigravity) |
 
-**XRON is an algorithmic encoder, not an LLM summarizer.** It never drops, hallucinates, or estimates data.
+---
+
+## Zero-Hallucination & Lossless Guarantee
+
+Because XRON targets LLMs, a common concern is the "hallucination" of data during compression or decompression.
+
+**XRON is an algorithmic encoder, not an LLM summariser.** It never drops, hallucinates, or estimates data.
+
 - **Strictly Lossless:** The exact data type topology (including native Javascript `BigInt` arrays and primitive permutations) is structurally identical via `XRON.parse(XRON.stringify(data))` assertion logic.
-- **Generative CI Testing:** XRON's CI/CD pipeline uses property-based generative testing (using randomly nested payloads of variable keys, `Date`, `BigInt`, floats, and Unicode strings) to simulate intense chaos. Hundreds of randomized edge cases are automatically compressed and decompressed on every commit to mathematically isolate and guarantee zero hallucination drops.
+- **Generative CI Testing:** XRON's CI/CD pipeline uses property-based generative testing (using randomly nested payloads of variable keys, `Date`, `BigInt`, floats, and Unicode strings) to simulate intense chaos. Hundreds of randomised edge cases are automatically compressed and decompressed on every commit to mathematically isolate and guarantee zero hallucination drops.
 - **Native BigInt Support:** XRON dynamically manages integer precision via Level 3 BigInt Delta calculation heuristics out-of-the-box. Sequential `BigInt` columns (e.g. `9999999999999999999n`) compress smoothly (`+1`) without Javascript math degradation.
 
 ---
@@ -87,7 +112,7 @@ const data = [
   { id: 3, name: 'Carol', dept: 'Sales' },
 ];
 
-// Serialize to XRON (Level 2 by default)
+// Serialise to XRON (Level 2 by default)
 const xron = XRON.stringify(data);
 // Output:
 // @v2
@@ -102,7 +127,7 @@ const xron = XRON.stringify(data);
 const restored = XRON.parse(xron);
 // restored deep-equals data
 
-// Analyze compression metrics
+// Analyse compression metrics
 const stats = await XRON.analyze(data);
 // { inputTokens: 85, outputTokens: 28, reduction: 67, ... }
 ```
@@ -118,7 +143,7 @@ const xron = XRON.stringify(data, { level: 'auto' });
 // Auto with threshold: skip compression for tiny payloads
 const xron = XRON.stringify(data, { level: 'auto', minCompressSize: 150 });
 
-// Understand why a level was chosen (sync, no serialization)
+// Understand why a level was chosen (sync, no serialisation)
 const rec = XRON.recommend(data);
 console.log(rec.recommendedLevel);  // 3
 console.log(rec.reason);            // "Full compression stack beneficial..."
@@ -144,8 +169,8 @@ const output = XRON.stringify(data, { level: 1 });
 
 ```
 @v1
-@S Item: id, name, dept
-@N3 Item
+@S Entity: id, name, dept
+@N3 Entity
 1, Alice, Sales
 2, Bob, Engineering
 3, Carol, Sales
@@ -200,21 +225,24 @@ const output = XRON.stringify(records, { level: 3 });
 +1	User5	+1	+10
 ```
 
-**What Level 3 adds:** Column templates (`@T`) detect common prefix/suffix patterns — in this example, all emails match `user{}@example.com`, so only the variable part (`1`, `2`, etc.) is stored. Substring dictionaries (`@P`) extract repeated substrings shared across otherwise-unique values. The `id` column is delta-encoded as `+1` after the first row (since each ID increments by 1). The `score` column is also delta-encoded as `+10`. If consecutive rows share the same value in a non-delta column, that value is replaced with `~` (repeat marker). Tab separators replace `, ` to save one character per field boundary. UUIDs like `550e8400-e29b-41d4-a716-446655440000` are compressed to `^` plus a Base62 string (~22 characters instead of 36).
+**What Level 3 adds:** Column templates (`@T`) detect common prefix/suffix patterns -- in this example, all emails match `user{}@example.com`, so only the variable part (`1`, `2`, etc.) is stored. Substring dictionaries (`@P`) extract repeated substrings shared across otherwise-unique values. The `id` column is delta-encoded as `+1` after the first row (since each ID increments by 1). The `score` column is also delta-encoded as `+10`. If consecutive rows share the same value in a non-delta column, that value is replaced with `~` (repeat marker). Tab separators replace `, ` to save one character per field boundary. UUIDs like `550e8400-e29b-41d4-a716-446655440000` are compressed to `^` plus a Base62 string (~22 characters instead of 36).
 
 ---
 
 ## Payload Size Categories & Expected Behaviour
 
-XRON classifies payloads by their JSON-serialized byte size. The adaptive mode (`level: 'auto'`) uses these categories to decide what compression is worthwhile.
+XRON classifies payloads by their JSON-serialised byte size. The adaptive mode (`level: 'auto'`) uses these categories to decide what compression is worthwhile.
 
 | Category | JSON Size | Typical Data | Auto Behaviour | Expected Savings |
 |----------|-----------|-------------|----------------|------------------|
 | **Tiny** | < 150 B | Single config object, 1-2 items | Returns raw JSON (headers cost more than they save) | 0% (no overhead) |
-| **Small** | 150 B – 500 B | 3-10 item array, shallow config | Level 1 (schema only, no dict/delta) | 10-30% |
-| **Medium** | 500 B – 5 KB | 10-50 item array with some repetition | Level 2 (schema + dictionary) | 30-55% |
-| **Large** | 5 KB – 50 KB | 50-500 item array, API responses | Level 2 or 3 (full stack when delta applies) | 55-70% |
+| **Small** | 150 B -- 500 B | 3-10 item array, shallow config | Level 1 (schema only, no dict/delta) | 10-30% |
+| **Medium** | 500 B -- 5 KB | 10-50 item array with some repetition | Level 2 (schema + dictionary) | 30-55% |
+| **Large** | 5 KB -- 50 KB | 50-500 item array, API responses | Level 2 or 3 (full stack when delta applies) | 55-70% |
 | **Very Large** | > 50 KB | 500+ item datasets, bulk exports | Level 3 (all layers activate) | 65-80% |
+
+<details>
+<summary><strong>How auto mode decides</strong></summary>
 
 ### What each threshold means
 
@@ -222,34 +250,34 @@ XRON classifies payloads by their JSON-serialized byte size. The adaptive mode (
 
 - **150-500 B**: Schema extraction can eliminate repeated keys, but the dictionary `@D` header often costs more than it saves (few repeated values in small datasets). Level 1 is the sweet spot.
 
-- **500 B+**: With more than ~10 rows, key elimination amortizes well. Repeated string values (department names, status codes) start appearing enough to justify a dictionary. Level 2 activates.
+- **500 B+**: With more than ~10 rows, key elimination amortises well. Repeated string values (department names, status codes) start appearing enough to justify a dictionary. Level 2 activates.
 
 - **5 KB+**: Datasets large enough for delta patterns (sequential IDs, incrementing timestamps) to emerge. Level 3's `+1` notation on an ID column saves ~2 chars per row across hundreds of rows.
 
-### How auto decides
+### Decision flow
 
 ```
 Is data < 150 bytes (or < minCompressSize)?
-  YES → return JSON.stringify (no XRON overhead)
-  NO  ↓
+  YES -> return JSON.stringify (no XRON overhead)
+  NO  |
 
-Are there ≥2 objects sharing the same shape?
-  NO  → Level 1 (schema headers still provide some key savings)
-  YES ↓
+Are there >=2 objects sharing the same shape?
+  NO  -> Level 1 (schema headers still provide some key savings)
+  YES |
 
 Are there repeated string values worth a dictionary?
-  NO  → Are there sequential numeric columns?
-          YES → Level 3 (schema + delta, skip dictionary)
-          NO  → Level 1 (higher levels add nothing)
-  YES ↓
+  NO  -> Are there sequential numeric columns?
+          YES -> Level 3 (schema + delta, skip dictionary)
+          NO  -> Level 1 (higher levels add nothing)
+  YES |
 
 Are there sequential numeric columns?
-  YES → Level 3 (full compression stack)
-  NO  → Level 2 (schema + dictionary)
+  YES -> Level 3 (full compression stack)
+  NO  -> Level 2 (schema + dictionary)
 
 Finally: is the XRON output actually smaller than JSON?
-  NO  → return JSON.stringify (never worse guarantee)
-  YES → return XRON output
+  NO  -> return JSON.stringify (never worse guarantee)
+  YES -> return XRON output
 ```
 
 ### Configuring the threshold
@@ -258,11 +286,13 @@ Finally: is the XRON output actually smaller than JSON?
 // Skip XRON for payloads under 200 bytes
 XRON.stringify(data, { level: 'auto', minCompressSize: 200 });
 
-// Always compress (even tiny data — uses XRON format, may be larger than JSON for tiny payloads)
+// Always compress (even tiny data -- uses XRON format, may be larger than JSON for tiny payloads)
 XRON.stringify(data, { level: 2 }); // Fixed levels always compress
 ```
 
 > **Note**: `minCompressSize` only applies to `level: 'auto'`. Fixed levels (1, 2, 3) always produce XRON output regardless of payload size. Even with a fixed level, the library naturally skips layers that don't help (e.g., dictionary encoding is omitted when no repeated values exist, delta encoding is omitted when no sequential columns exist).
+
+</details>
 
 ---
 
@@ -270,7 +300,7 @@ XRON.stringify(data, { level: 2 }); // Fixed levels always compress
 
 ### `XRON.stringify(value, options?): string`
 
-Serialize any JavaScript value to XRON format.
+Serialise any JavaScript value to XRON format.
 
 ```typescript
 function stringify(value: any, options?: XronOptions): string;
@@ -280,10 +310,10 @@ function stringify(value: any, options?: XronOptions): string;
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `value` | `any` | -- | The value to serialize. Objects, arrays, primitives, and nested structures are all supported. |
+| `value` | `any` | -- | The value to serialise. Objects, arrays, primitives, and nested structures are all supported. |
 | `options.level` | `1 \| 2 \| 3 \| 'auto'` | `2` | Compression level. `'auto'` analyses the data and picks the optimal level (recommended for most use cases). |
 | `options.minCompressSize` | `number` | `0` | Minimum JSON byte size before XRON compression is attempted. Only applies when `level` is `'auto'`. Payloads below this threshold are returned as `JSON.stringify`. Recommended: `150`. |
-| `options.tokenizer` | `'o200k_base' \| 'cl100k_base' \| 'claude'` | `'o200k_base'` | BPE tokenizer profile for Level 3 optimization. |
+| `options.tokenizer` | `'o200k_base' \| 'cl100k_base' \| 'claude'` | `'o200k_base'` | BPE tokeniser profile for Level 3 optimisation. |
 | `options.indent` | `number` | `2` | Indentation width for Level 1 nested objects. |
 | `options.maxDictSize` | `number` | `256` | Maximum dictionary entries (Level 2+). |
 | `options.deltaThreshold` | `number` | `3` | Minimum rows required before delta encoding activates. |
@@ -316,7 +346,7 @@ function parse(input: string): any;
 |-----------|------|-------------|
 | `input` | `string` | An XRON-formatted string. |
 
-**Returns:** The deserialized JavaScript value.
+**Returns:** The deserialised JavaScript value.
 
 **Throws:**
 - `TypeError` if the input is not a string.
@@ -326,7 +356,7 @@ function parse(input: string): any;
 
 ### `XRON.analyze(value, options?): Promise<XronAnalysis>`
 
-Analyze compression metrics for a given value. Reports token counts at each level and overall reduction percentage.
+Analyse compression metrics for a given value. Reports token counts at each level and overall reduction percentage.
 
 ```typescript
 function analyze(value: any, options?: XronOptions): Promise<XronAnalysis>;
@@ -354,13 +384,14 @@ interface XronAnalysis {
 
 ### `XRON.recommend(value, options?): XronRecommendation`
 
-Synchronously analyses the data and returns a compression recommendation without actually serializing. Useful for understanding what auto mode would do, displaying compression advice to users, or making informed decisions about which level to use.
+Synchronously analyses the data and returns a compression recommendation without actually serialising. Useful for understanding what auto mode would do, displaying compression advice to users, or making informed decisions about which level to use.
 
 ```typescript
 function recommend(value: any, options?: XronOptions): XronRecommendation;
 ```
 
-**Returns:** An `XronRecommendation` object:
+<details>
+<summary><strong>XronRecommendation interface</strong></summary>
 
 ```typescript
 interface XronRecommendation {
@@ -386,6 +417,8 @@ interface XronRecommendation {
 }
 ```
 
+</details>
+
 **Example:**
 
 ```typescript
@@ -406,6 +439,9 @@ const rec = XRON.recommend({ host: 'localhost', port: 3000 });
 ---
 
 ## Format Specification
+
+<details>
+<summary><strong>Header directives and encoding rules</strong></summary>
 
 An XRON document consists of a header section followed by a data section. All headers are prefixed with `@`.
 
@@ -467,7 +503,7 @@ Declares how many data rows follow for a given schema. This enables the parser t
 Defines a prefix/suffix pattern for a column. Values in that column are stored as the variable part only. The `{}` placeholder marks where the variable portion sits within the template.
 
 ```
-@T 2: user{}@example.com    ← column 2 follows this pattern
+@T 2: user{}@example.com    <- column 2 follows this pattern
 ```
 
 Data rows for column 2 then contain only the variable part (e.g., `alice` instead of `alice@example.com`). The parser reconstructs the full value by inserting the stored part into the template.
@@ -477,12 +513,12 @@ Data rows for column 2 then contain only the variable part (e.g., `alice` instea
 Like `@D` but for substrings within values. Repeated substrings that appear across otherwise-unique values are extracted into a shared dictionary. References use the `%N;` format, where `N` is the zero-based dictionary index.
 
 ```
-@P: @example.com            ← shared substring
-user1%0;                     ← %0; expands to @example.com
-user2%0;                     ← same expansion
+@P: @example.com            <- shared substring
+user1%0;                     <- %0; expands to @example.com
+user2%0;                     <- same expansion
 ```
 
-Substring dictionaries are built when full-value dictionary encoding (`@D`) does not apply — i.e., the values are unique but share common fragments.
+Substring dictionaries are built when full-value dictionary encoding (`@D`) does not apply -- i.e., the values are unique but share common fragments.
 
 ### Delta Encoding (`+N`)
 
@@ -508,7 +544,7 @@ At Level 3, when a non-delta column has the same value as the previous row, it i
 
 ### Nested Schema References (`Schema(val1, val2)`)
 
-When an object field consistently contains objects matching another schema, nested values are encoded inline using parenthesized notation:
+When an object field consistently contains objects matching another schema, nested values are encoded inline using parenthesised notation:
 
 ```
 @S A: id, name, address
@@ -518,6 +554,8 @@ When an object field consistently contains objects matching another schema, nest
 2, Bob, B(456 Oak, LA, 90001)
 ```
 
+</details>
+
 ---
 
 ## Benchmarks & Format Comparison
@@ -526,67 +564,16 @@ When an object field consistently contains objects matching another schema, nest
 
 The same 10 employees (id, name, email, department, active) encoded in every format:
 
-**JSON (minified)** — 956 chars
-```json
-[{"id":1,"name":"Alice Johnson","email":"alice@example.com","department":"Sales","active":true},{"id":2,"name":"Bob Smith","email":"bob@example.com","department":"Engineering","active":false},...]
-```
+| Format | Chars | vs JSON |
+|--------|------:|--------:|
+| JSON (minified) | 956 | baseline |
+| TOON | 560 | -41% |
+| TRON | 559 | -42% |
+| XRON Level 1 | 557 | -42% |
+| **XRON Level 2** | **487** | **-49%** |
+| **XRON Level 3** | **495** | **-48%** |
 
-**TOON** — 560 chars (41% smaller)
-```
-[10]:
-  - id, name, email, department, active
-  1, Alice Johnson, alice@example.com, Sales, true
-  2, Bob Smith, bob@example.com, Engineering, false
-  3, Carol Williams, carol@example.com, Sales, true
-  ...
-```
-
-**TRON** — 559 chars (42% smaller)
-```
-class A: id, name, email, department, active
-A 1, Alice Johnson, alice@example.com, Sales, true
-A 2, Bob Smith, bob@example.com, Engineering, false
-A 3, Carol Williams, carol@example.com, Sales, true
-...
-```
-
-**XRON Level 1** — 557 chars (42% smaller)
-```
-@v1
-@S Entity: id, name, email, department, active
-@N10 Entity
-1, Alice Johnson, alice@example.com, Sales, true
-2, Bob Smith, bob@example.com, Engineering, false
-3, Carol Williams, carol@example.com, Sales, true
-...
-```
-
-**XRON Level 2** — 487 chars (49% smaller) ← *dictionary encoding kicks in*
-```
-@v2
-@S A: id, name, email, department, active?b
-@D: Engineering, Sales, Marketing
-@N10 A
-1, Alice Johnson, alice@example.com, $1, 1
-2, Bob Smith, bob@example.com, $0, 0
-3, Carol Williams, carol@example.com, $1, 1
-...
-```
-
-**XRON Level 3** — 495 chars (48% smaller) ← *delta + repeat encoding*
-```
-@v3
-@S A: id, name, email, department, active?b
-@D: Engineering, Sales, Marketing
-@N10 A
-1, Alice Johnson, alice@example.com, $1, 1
-+1, Bob Smith, bob@example.com, $0, 0
-+1, Carol Williams, carol@example.com, $1, 1
-+1, Dave Brown, dave@example.com, $0, ~
-...
-```
-
-> **Note**: At 10 rows, TOON and TRON perform similarly to XRON L1 because key elimination is the dominant win. XRON L2 pulls ahead via dictionary encoding (`Sales` → `$1`), and L3 adds delta (`+1`) and repeat (`~`) markers. The gap increases with dataset size.
+> At 10 rows, TOON and TRON perform similarly to XRON L1 because key elimination is the dominant win. XRON L2 pulls ahead via dictionary encoding (`Sales` -> `$1`), and L3 adds delta (`+1`) and repeat (`~`) markers. The gap increases with dataset size.
 
 ### At Scale: 100-Row Dataset (7 fields)
 
@@ -603,52 +590,76 @@ A 3, Carol Williams, carol@example.com, Sales, true
 | **XRON Level 2** | **5,367** | **-60%** | **-26%** | **-26%** |
 | **XRON Level 3** | **2,714** | **-80%** | **-62%** | **-62%** |
 
-Additional benchmarks:
-
 | Dataset | Rows | Fields | JSON Chars | XRON L3 Chars | Reduction |
 |---------|-----:|-------:|-----------:|--------------:|----------:|
 | Employees | 100 | 7 | 13,569 | 2,714 | 80% |
 | Employees | 500 | 5 | 52,840 | 12,682 | 76% |
 | IoT sensors | 200 | 6 | 28,150 | 7,882 | 72% |
 
-At 100 rows, XRON L3 is **62% smaller than TOON/TRON** — the gap comes from column templates, substring dictionaries, delta encoding, and separator reduction that neither TOON nor TRON have.
+At 100 rows, XRON L3 is **62% smaller than TOON/TRON** -- the gap comes from column templates, substring dictionaries, delta encoding, and separator reduction that neither TOON nor TRON have.
 
-### What XRON Does That TOON and TRON Cannot
+<details>
+<summary><strong>What XRON does that TOON and TRON cannot</strong></summary>
 
 | Technique | TOON | TRON | XRON | What It Saves |
 |-----------|:----:|:----:|:----:|---------------|
-| Key elimination (schema headers) | ✅ | ✅ | ✅ | Repeated property names across N objects |
-| Quote removal | ✅ | ✅ | ✅ | `"` around keys and simple values |
-| Short schema names (A, B, C) | ❌ | ✅ | ✅ | `User` → `A` saves chars per row |
-| Dictionary encoding (`$0`, `$1`) | ❌ | ❌ | ✅ | `"Engineering"` × 20 → `$0` × 20 |
-| Boolean compaction (`1`/`0`) | ❌ | ❌ | ✅ | `true`/`false` → `1`/`0` with lossless `?b` hint |
-| Null compaction (`-`) | ❌ | ❌ | ✅ | `null` → `-` |
-| Date compaction | ❌ | ❌ | ✅ | `"2026-04-01"` → `20260401` (no quotes, no hyphens) |
-| UUID compression | ❌ | ❌ | ✅ | 36-char UUID → ~22-char Base62 |
-| Delta encoding (`+1`) | ❌ | ❌ | ✅ | Sequential IDs: `1, 2, 3, ..., 100` → `1, +1, +1, ...` |
-| Column templates (`@T`) | ❌ | ❌ | ✅ | `user1@example.com` → `1` with template `user{}@example.com` |
-| Substring dictionary (`@P`) | ❌ | ❌ | ✅ | Repeated substrings across unique values → `%N;` refs |
-| Repeat markers (`~`) | ❌ | ❌ | ✅ | Consecutive same values: `Sales, Sales` → `Sales, ~` |
-| Separator reduction | ❌ | ❌ | ✅ | Tab separators at L3 save 1 char per field boundary |
-| Cardinality guards (`@N`) | ❌ | ❌ | ✅ | `@N100 A` — parser knows row count upfront (streaming) |
-| Adaptive level selection | ❌ | ❌ | ✅ | Auto-picks best level, returns JSON for tiny payloads |
-| Multi-tokenizer profiles | ❌ | ❌ | ✅ | Optimises separators for o200k_base, cl100k_base, claude |
+| Key elimination (schema headers) | Yes | Yes | Yes | Repeated property names across N objects |
+| Quote removal | Yes | Yes | Yes | `"` around keys and simple values |
+| Short schema names (A, B, C) | No | Yes | Yes | `User` -> `A` saves chars per row |
+| Dictionary encoding (`$0`, `$1`) | No | No | Yes | `"Engineering"` x 20 -> `$0` x 20 |
+| Boolean compaction (`1`/`0`) | No | No | Yes | `true`/`false` -> `1`/`0` with lossless `?b` hint |
+| Null compaction (`-`) | No | No | Yes | `null` -> `-` |
+| Date compaction | No | No | Yes | `"2026-04-01"` -> `20260401` (no quotes, no hyphens) |
+| UUID compression | No | No | Yes | 36-char UUID -> ~22-char Base62 |
+| Delta encoding (`+1`) | No | No | Yes | Sequential IDs: `1, 2, 3, ..., 100` -> `1, +1, +1, ...` |
+| Column templates (`@T`) | No | No | Yes | `user1@example.com` -> `1` with template `user{}@example.com` |
+| Substring dictionary (`@P`) | No | No | Yes | Repeated substrings across unique values -> `%N;` refs |
+| Repeat markers (`~`) | No | No | Yes | Consecutive same values: `Sales, Sales` -> `Sales, ~` |
+| Separator reduction | No | No | Yes | Tab separators at L3 save 1 char per field boundary |
+| Cardinality guards (`@N`) | No | No | Yes | `@N100 A` -- parser knows row count upfront (streaming) |
+| Adaptive level selection | No | No | Yes | Auto-picks best level, returns JSON for tiny payloads |
+| Multi-tokeniser profiles | No | No | Yes | Optimises separators for o200k_base, cl100k_base, claude |
 
-### Why the Gap Grows at Scale
+### Why the gap grows at scale
 
 At 10 rows, all three formats achieve ~42% reduction. The key-elimination layer is the dominant win, and all three have it. But as datasets grow:
 
-- **Dictionary savings scale linearly with row count.** "Engineering" appearing 200 times at 11 chars each = 2,200 chars. `$0` × 200 = 600 chars. Net saving: 1,600 chars. TOON and TRON pay the full 2,200 every time.
+- **Dictionary savings scale linearly with row count.** "Engineering" appearing 200 times at 11 chars each = 2,200 chars. `$0` x 200 = 600 chars. Net saving: 1,600 chars. TOON and TRON pay the full 2,200 every time.
 
-- **Delta savings scale linearly with row count.** A 500-row sequential ID column: JSON/TOON/TRON store `1, 2, 3, ..., 500` (varying lengths). XRON stores `1, +1, +1, ..., +1` — saving ~1,200 chars.
+- **Delta savings scale linearly with row count.** A 500-row sequential ID column: JSON/TOON/TRON store `1, 2, 3, ..., 500` (varying lengths). XRON stores `1, +1, +1, ..., +1` -- saving ~1,200 chars.
 
-- **Boolean/null savings accumulate.** 500 × `true` = 2,000 chars. 500 × `1` = 500 chars. Saving: 1,500 chars.
+- **Boolean/null savings accumulate.** 500 x `true` = 2,000 chars. 500 x `1` = 500 chars. Saving: 1,500 chars.
 
-- **XRON overhead is fixed.** The `@v2`, `@S`, `@D` headers cost ~50 chars regardless of dataset size. This fixed cost amortizes to near-zero on large datasets.
+- **XRON overhead is fixed.** The `@v2`, `@S`, `@D` headers cost ~50 chars regardless of dataset size. This fixed cost amortises to near-zero on large datasets.
+
+</details>
 
 ---
 
-## How It Works
+## Comparison with Alternatives
+
+| Feature | JSON | YAML | CSV | TOON | TRON | XRON |
+|---------|------|------|-----|------|------|------|
+| Lossless round-trip | Yes | Yes | No | Yes | Yes | Yes |
+| Nested objects | Yes | Yes | No | Yes | Yes | Yes |
+| Schema extraction | No | No | No | No | No | Yes |
+| Dictionary encoding | No | No | No | No | No | Yes |
+| Column templates | No | No | No | No | No | Yes |
+| Substring dictionary | No | No | No | No | No | Yes |
+| Delta compression | No | No | No | No | No | Yes |
+| Separator reduction | No | No | No | No | No | Yes |
+| Tokeniser alignment | No | No | No | No | No | Yes |
+| Type-aware encoding | No | No | No | Partial | Partial | Yes |
+| Token reduction | 0% | ~5% | ~40% | ~33% | ~50% | ~80% |
+| Streaming-friendly | No | No | Yes | Yes | Yes | Yes |
+| Human-readable | Yes | Yes | Yes | Yes | No | Level 1 |
+
+**TOON** (Terse Object-Oriented Notation) strips JSON quotes and uses indentation but retains keys on every object. **TRON** (Terse Reduced Object Notation) adds columnar encoding but lacks dictionary, delta, and tokeniser optimisations. XRON builds on both with a full compression pipeline.
+
+---
+
+<details>
+<summary><strong>How It Works -- Layer-by-Layer Deep Dive</strong></summary>
 
 ### Layer 1: Schema Extraction
 
@@ -680,43 +691,23 @@ Identifies repeated substrings that appear across otherwise-unique string values
 
 ### Layer 7: Delta + Repeat Compression
 
-Analyzes numeric columns for sequential patterns. If deltas between consecutive values are constant or significantly smaller than absolute values, the column is delta-encoded. Non-delta columns with repeated consecutive values are replaced with `~` (same-as-previous) markers.
+Analyses numeric columns for sequential patterns. If deltas between consecutive values are constant or significantly smaller than absolute values, the column is delta-encoded. Non-delta columns with repeated consecutive values are replaced with `~` (same-as-previous) markers.
 
 ### Layer 8: Separator Reduction
 
 Replaces the default comma-space (`, `) field separator with a tab character (`\t`) at Level 3. This saves one character per field boundary across every row. The parser auto-detects whether a document uses tab or comma-space separators, so both formats decode transparently.
 
-### Layer 9: Tokenizer Alignment
+### Layer 9: Tokeniser Alignment
 
-Selects separators and layout characters that minimise token count for the target BPE tokenizer. Key choices:
+Selects separators and layout characters that minimise token count for the target BPE tokeniser. Key choices:
 - Newline (`\n`) as row separator: always 1 token
 - Tab (`\t`) or comma-space (`, `) as field separator depending on level
-- `@` as header prefix: 1 token in o200k_base, cl100k_base, and Claude tokenizers
+- `@` as header prefix: 1 token in o200k_base, cl100k_base, and Claude tokenisers
 - Parentheses for nesting: 1 token each
 
-Supports `o200k_base` (GPT-4o/GPT-5), `cl100k_base` (GPT-4/GPT-3.5), and `claude` (Claude 3.x/4.x) tokenizer profiles.
+Supports `o200k_base` (GPT-4o/GPT-5), `cl100k_base` (GPT-4/GPT-3.5), and `claude` (Claude 3.x/4.x) tokeniser profiles.
 
----
-
-## Comparison with Alternatives
-
-| Feature | JSON | YAML | CSV | TOON | TRON | XRON |
-|---------|------|------|-----|------|------|------|
-| Lossless round-trip | Yes | Yes | No | Yes | Yes | Yes |
-| Nested objects | Yes | Yes | No | Yes | Yes | Yes |
-| Schema extraction | No | No | No | No | No | Yes |
-| Dictionary encoding | No | No | No | No | No | Yes |
-| Column templates | No | No | No | No | No | Yes |
-| Substring dictionary | No | No | No | No | No | Yes |
-| Delta compression | No | No | No | No | No | Yes |
-| Separator reduction | No | No | No | No | No | Yes |
-| Tokenizer alignment | No | No | No | No | No | Yes |
-| Type-aware encoding | No | No | No | Partial | Partial | Yes |
-| Token reduction | 0% | ~5% | ~40% | ~33% | ~50% | ~80% |
-| Streaming-friendly | No | No | Yes | Yes | Yes | Yes |
-| Human-readable | Yes | Yes | Yes | Yes | No | Level 1 |
-
-**TOON** (Terse Object-Oriented Notation) strips JSON quotes and uses indentation but retains keys on every object. **TRON** (Terse Reduced Object Notation) adds columnar encoding but lacks dictionary, delta, and tokenizer optimizations. XRON builds on both with a full compression pipeline.
+</details>
 
 ---
 
@@ -746,8 +737,8 @@ npm test
 ```
 src/
   index.ts              Main entry point, XRON namespace, analyze()
-  stringify.ts           Serialization engine (9-layer pipeline orchestration)
-  parse.ts              Deserialization engine (reverse pipeline)
+  stringify.ts           Serialisation engine (9-layer pipeline orchestration)
+  parse.ts              Deserialisation engine (reverse pipeline)
   types.ts              Core type definitions and defaults
   pipeline/
     adaptive.ts         L0: Adaptive level selection (auto mode)
@@ -758,7 +749,7 @@ src/
     column-template.ts  L5: Column template detection and encoding
     substring-dict.ts   L6: Substring frequency analysis and encoding
     delta.ts            L7: Delta and repeat compression
-    tokenizer-opt.ts    L8-L9: Separator reduction and tokenizer alignment
+    tokenizer-opt.ts    L8-L9: Separator reduction and tokeniser alignment
   format/
     header.ts           @v, @S, @D, @N header formatting and parsing
     escape.ts           String escaping and quoting rules
@@ -775,7 +766,7 @@ src/
 - All changes must pass `npm test` (lossless round-trip tests are the primary correctness guarantee).
 - New compression techniques should be added as new pipeline layers with clear entry/exit contracts.
 - The format must remain human-readable at Level 1.
-- Performance matters: the serializer should add minimal overhead beyond `JSON.stringify`.
+- Performance matters: the serialiser should add minimal overhead beyond `JSON.stringify`.
 
 ---
 
@@ -787,6 +778,12 @@ src/
 
 ---
 
-## License
+## Licence
 
 MIT -- see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  Built by <a href="https://emplireamplify.com.au">Empire Amplify</a>
+</p>
