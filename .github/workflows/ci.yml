@@ -4,10 +4,12 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [master]
 
 jobs:
   test:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     strategy:
       matrix:
