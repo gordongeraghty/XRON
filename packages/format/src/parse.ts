@@ -35,7 +35,7 @@ import { SubstringEntry, expandSubstringRefs } from './pipeline/substring-dict.j
 /**
  * Parse an XRON string back to a JavaScript value.
  */
-export function parse(input: string, options?: XronOptions): any {
+export function parse(input: string, options?: XronOptions): unknown {
   if (typeof input !== 'string') {
     throw new TypeError('XRON.parse expects a string input');
   }
@@ -236,7 +236,7 @@ function parseDataSection(
   columnTemplates: ColumnTemplate[] = [],
   substringDict: string[] = [],
   strict = false,
-): any {
+): unknown {
   if (lines.length === 0) return null;
 
   let lineIdx = 0;
@@ -359,7 +359,7 @@ function decodeSchemaRows(
   dictionary: string[],
   columnTemplates: ColumnTemplate[] = [],
   substringDict: string[] = [],
-): any[] {
+): unknown[] {
   // Split each row into cells
   let cells = rows.map(row => splitRow(row));
 
@@ -413,9 +413,9 @@ function decodeSchemaRows(
   }
 
   // Convert cells back to objects
-  const items: any[] = [];
+  const items: unknown[] = [];
   for (const row of cells) {
-    const obj: Record<string, any> = {};
+    const obj: Record<string, unknown> = {};
     for (let i = 0; i < schema.fields.length; i++) {
       const field = schema.fields[i];
       const raw = i < row.length ? row[i].trim() : '';
@@ -440,7 +440,7 @@ function decodeSchemaRows(
       }
 
       // Check for inline array [val, val, ...] or object {key: val, ...}
-      let decoded: any;
+      let decoded: unknown;
       if (raw.startsWith('[') && raw.endsWith(']')) {
         decoded = parseInlineBracketArray(raw, version, dictionary, schemasByName);
       } else if (raw.startsWith('{') && raw.endsWith('}')) {
@@ -474,9 +474,9 @@ function decodeSchemaInstance(
   schemas: Map<string, SchemaDefinition>,
   schemasByName: Map<string, SchemaDefinition>,
   dictionary: string[],
-): Record<string, any> {
+): Record<string, unknown> {
   const values = splitRow(argsStr);
-  const obj: Record<string, any> = {};
+  const obj: Record<string, unknown> = {};
 
   for (let i = 0; i < schema.fields.length; i++) {
     const field = schema.fields[i];
@@ -502,7 +502,7 @@ function decodeSchemaInstance(
     }
 
     // Check for inline array/object
-    let decoded: any;
+    let decoded: unknown;
     if (raw.startsWith('[') && raw.endsWith(']')) {
       decoded = parseInlineBracketArray(raw, version, dictionary, schemasByName);
     } else if (raw.startsWith('{') && raw.endsWith('}')) {
@@ -532,7 +532,7 @@ function decodeRawValue(
   raw: string,
   version: XronLevel,
   dictionary: string[],
-): any {
+): unknown {
   if (raw === '') return '';
 
   // Dictionary reference ($N)
@@ -554,7 +554,7 @@ function parseInlineArray(
   schemas: Map<string, SchemaDefinition>,
   schemasByName: Map<string, SchemaDefinition>,
   dictionary: string[],
-): any[] {
+): unknown[] {
   const items: any[] = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -588,7 +588,7 @@ function parseKeyValueBlock(
   version: XronLevel,
   dictionary: string[],
   schemasByName: Map<string, SchemaDefinition>,
-): any {
+): unknown {
   const lines = input.split('\n');
   const result: Record<string, any> = {};
 
@@ -661,7 +661,7 @@ function parseInlineBracketArray(
   version: XronLevel,
   dictionary: string[],
   schemasByName: Map<string, SchemaDefinition>,
-): any[] {
+): unknown[] {
   const inner = line.slice(1, -1).trim();
   if (inner === '') return [];
 
@@ -686,11 +686,11 @@ function parseInlineBracketObject(
   line: string,
   version: XronLevel,
   dictionary: string[],
-): Record<string, any> {
+): Record<string, unknown> {
   const inner = line.slice(1, -1).trim();
   if (inner === '') return {};
 
-  const obj: Record<string, any> = {};
+  const obj: Record<string, unknown> = {};
   const pairs = splitTopLevel(inner);
 
   for (const pair of pairs) {
@@ -777,7 +777,7 @@ function splitKeyValue(str: string): [string, string] {
 
 import { unescapeValue } from './format/escape.js';
 
-export async function* parseStream(input: AsyncIterable<string> | any, options?: XronOptions): AsyncIterable<any> {
+export async function* parseStream(input: AsyncIterable<string> | AsyncIterable<Buffer>, options?: XronOptions): AsyncIterable<unknown> {
     let fullInput = '';
     for await (const chunk of input) {
         fullInput += chunk;
