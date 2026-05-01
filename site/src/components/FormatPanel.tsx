@@ -124,6 +124,7 @@ export default function FormatPanel({
         <button
           onClick={handleCopy}
           title="Copy to clipboard"
+          aria-label={copied ? "Copied to clipboard" : "Copy to clipboard"}
           className="mt-1 p-1.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-xs"
         >
           {copied ? (

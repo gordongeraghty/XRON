@@ -129,10 +129,11 @@ export default function Playground() {
           <DatasetSelector selectedId={presetId} onChange={setPresetId} />
         ) : (
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+            <label htmlFor="custom-json" className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
               Paste JSON
             </label>
             <textarea
+              id="custom-json"
               value={customJson}
               onChange={e => handleCustomChange(e.target.value)}
               rows={8}
@@ -221,8 +222,9 @@ export default function Playground() {
         <div className="flex items-center gap-4 flex-wrap">
           {/* Baseline selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Baseline:</span>
+            <label htmlFor="baseline-select" className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Baseline:</label>
             <select
+              id="baseline-select"
               value={baseline}
               onChange={e => setBaseline(e.target.value as FormatId)}
               className="px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
