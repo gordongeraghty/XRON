@@ -1,0 +1,18 @@
+--- packages/format/src/parse.ts
++++ packages/format/src/parse.ts
+@@ -607,6 +614,7 @@
+     if (!keyPart) continue;
+
+     const key = unescapeValue(keyPart.trim());
++    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+     const valuePart = valuePartRaw.trim();
+
+     if (valuePart === '') {
+@@ -705,6 +713,7 @@
+     const [keyPart, rawValPart] = splitKeyValue(pair);
+     if (!keyPart) continue;
+     const key = unescapeValue(keyPart.trim());
++    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+     const rawVal = rawValPart.trim();
+
+     if (rawVal.startsWith('{') && rawVal.endsWith('}')) {

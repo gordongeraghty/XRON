@@ -80,16 +80,7 @@ export function parse(input: string, options?: XronOptions): any {
     // because the XRON output would have been larger than the JSON original.
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed && typeof parsed === 'object') {
-          return JSON.parse(trimmed, (k, v) => {
-            if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
-              return undefined;
-            }
-            return v;
-          });
-        }
-        return parsed;
+        return JSON.parse(trimmed);
       } catch {
         // Not valid JSON — fall through to XRON key-value parser
       }
@@ -735,7 +726,7 @@ function splitTopLevel(input: string): string[] {
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
-    
+
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
       current += ch;
