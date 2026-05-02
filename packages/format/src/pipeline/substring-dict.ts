@@ -132,29 +132,48 @@ export function applySubstringRefs(
   // Sort entries by value length descending — match longest first
   const sorted = [...substringDict].sort((a, b) => b.value.length - a.value.length);
 
-  return cells.map(row =>
-    row.map(cell => {
+  const result = new Array<string[]>(cells.length);
+
+  for (let i = 0; i < cells.length; i++) {
+    const row = cells[i];
+    const newRow = new Array<string>(row.length);
+
+    for (let j = 0; j < row.length; j++) {
+      const cell = row[j];
+
       // Skip special values
       if (!cell || cell === '-' || cell === '~' || cell.startsWith('$') || cell.startsWith('+')) {
-        return cell;
+        newRow[j] = cell;
+        continue;
       }
 
       // Escape existing literal % → %% before any substitution
-      let escaped = cell.replace(/%/g, '%%');
+      let escaped = cell;
+      if (cell.indexOf('%') !== -1) {
+        escaped = cell.replace(/%/g, '%%');
+      }
 
       // Try each substring entry (longest first)
+      let replaced = false;
       for (const entry of sorted) {
         const idx = escaped.indexOf(entry.value);
         if (idx !== -1) {
           // Replace the FIRST occurrence only — use %N; format (semicolon-terminated)
           // to prevent ambiguity when the next character after the ref is a digit
-          return escaped.slice(0, idx) + '%' + entry.index + ';' + escaped.slice(idx + entry.value.length);
+          newRow[j] = escaped.slice(0, idx) + '%' + entry.index + ';' + escaped.slice(idx + entry.value.length);
+          replaced = true;
+          break;
         }
       }
 
-      return escaped;
-    })
-  );
+      if (!replaced) {
+        newRow[j] = escaped;
+      }
+    }
+    result[i] = newRow;
+  }
+
+  return result;
 }
 
 /**
@@ -174,24 +193,35 @@ export function expandSubstringRefs(
     lookup.set(entry.index, entry.value);
   }
 
-  return cells.map(row =>
-    row.map(cell => {
-      if (!cell) return cell;
+  const result = new Array<string[]>(cells.length);
+  const sentinel = '\x00PCNT\x00';
+  const sentinelRegex = new RegExp(sentinel, 'g');
+
+  for (let i = 0; i < cells.length; i++) {
+    const row = cells[i];
+    const newRow = new Array<string>(row.length);
+    for (let j = 0; j < row.length; j++) {
+      const cell = row[j];
+      if (!cell || cell.indexOf('%') === -1) {
+        newRow[j] = cell;
+        continue;
+      }
 
       // Step 1: Temporarily replace escaped %% with a sentinel
-      const sentinel = '\x00PCNT\x00';
-      let result = cell.replace(/%%/g, sentinel);
+      let res = cell.replace(/%%/g, sentinel);
 
       // Step 2: Expand %N; references (semicolon-terminated)
-      result = result.replace(/%(\d+);/g, (match, indexStr) => {
+      res = res.replace(/%(\d+);/g, (match, indexStr) => {
         const index = parseInt(indexStr, 10);
         return lookup.get(index) ?? match; // Keep original if not found
       });
 
       // Step 3: Restore sentinel → literal %
-      result = result.replace(new RegExp(sentinel, 'g'), '%');
+      res = res.replace(sentinelRegex, '%');
 
-      return result;
-    })
-  );
+      newRow[j] = res;
+    }
+    result[i] = newRow;
+  }
+  return result;
 }

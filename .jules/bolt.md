@@ -1,3 +1,6 @@
 ## 2024-05-30 - Replaced Array.reduce with imperative loops in delta encoding
 **Learning:** In delta encoding analysis for large tabular datasets, `Array.reduce` over hundreds or thousands of rows incurs a measurable performance overhead due to repeated callback invocation.
 **Action:** Replaced `Array.reduce` with imperative `for` loops in `analyzeTemporalColumn` and `analyzeNumericColumn` in `packages/format/src/pipeline/delta.ts`. The loop implementation runs roughly 10x faster for absolute sum calculations, which is critical when analyzing multiple columns across many rows during serialization.
+## 2024-05-30 - Replaced Array.map and spread operator with imperative loops in string pipelines
+**Learning:** In string pipelines acting on large multi-dimensional arrays, `Array.map` and array spread operations create measurable performance overhead through function instantiation and array re-allocations compared to tightly bound imperative `for` loops.
+**Action:** Replaced `Array.map` and spread operator `[...row]` with pre-allocated arrays (`new Array(length)`) and direct index access `for` loops in `applySubstringRefs`, `expandSubstringRefs`, `detectColumnTemplates`, `applyColumnTemplates`, and `expandColumnTemplates`.
