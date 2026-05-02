@@ -58,7 +58,10 @@ export function analyzeDeltaColumns(
   const deltaColumns: DeltaColumnInfo[] = [];
 
   for (let col = 0; col < schema.fields.length; col++) {
-    const values = rows.map(row => row[col]);
+    const values = new Array(rows.length);
+    for (let r = 0; r < rows.length; r++) {
+      values[r] = rows[r][col];
+    }
 
     // Check for temporal (ISO date string) sequential pattern first
     const temporalInfo = analyzeTemporalColumn(values, col);
@@ -91,7 +94,10 @@ function analyzeTemporalColumn(
   if (!values.every(v => typeof v === 'string' && ISO_DATE_RE.test(v))) return null;
 
   // Convert to epoch seconds
-  const epochs: number[] = values.map(v => Math.floor(new Date(v as string).getTime() / 1000));
+  const epochs: number[] = new Array(values.length);
+  for (let r = 0; r < values.length; r++) {
+    epochs[r] = Math.floor(new Date(values[r] as string).getTime() / 1000);
+  }
 
   // Verify all parsed correctly
   if (epochs.some(e => isNaN(e))) return null;
@@ -151,7 +157,10 @@ function analyzeNumericColumn(
     // Mixed safety: promote all numeric values to BigInt
     if (!values.every(v => typeof v === 'bigint' || (typeof v === 'number' && isFinite(v)))) return null;
 
-    const bigValues: bigint[] = values.map(v => BigInt(v as number | bigint));
+    const bigValues: bigint[] = new Array(values.length);
+    for (let r = 0; r < values.length; r++) {
+      bigValues[r] = BigInt(values[r] as number | bigint);
+    }
     const deltas: bigint[] = [];
     for (let i = 1; i < bigValues.length; i++) {
       deltas.push(bigValues[i] - bigValues[i - 1]);
@@ -243,7 +252,16 @@ export function applyDeltaEncoding(
 ): string[][] {
   if (rows.length === 0 || deltaColumns.length === 0) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
 
   for (const deltaInfo of deltaColumns) {
     const col = deltaInfo.columnIndex;
@@ -293,8 +311,21 @@ export function applyRepeatEncoding(
 ): string[][] {
   if (rows.length < 2) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
-  const deltaColSet = new Set(deltaColumns.map(d => d.columnIndex));
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
+
+  const deltaColSet = new Set<number>();
+  for (let i = 0; i < deltaColumns.length; i++) {
+    deltaColSet.add(deltaColumns[i].columnIndex);
+  }
 
   for (let col = 0; col < (rows[0]?.length ?? 0); col++) {
     // Skip delta-encoded columns
@@ -322,7 +353,16 @@ export function decodeDeltaRows(
 ): string[][] {
   if (rows.length === 0) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
 
   for (const col of deltaColumns) {
     const isTemporal = temporalColumns?.has(col) ?? false;
@@ -401,7 +441,16 @@ export function decodeDeltaRows(
 export function decodeRepeatRows(rows: string[][]): string[][] {
   if (rows.length < 2) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
 
   for (let col = 0; col < (rows[0]?.length ?? 0); col++) {
     for (let row = 1; row < result.length; row++) {
