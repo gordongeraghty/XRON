@@ -17,6 +17,25 @@
 import { DeltaColumnInfo, SchemaDefinition } from '../types.js';
 import { expandDate } from './type-encoding.js';
 
+/**
+ * Helper to quickly deep-clone a 2D array of primitives (strings/numbers).
+ * Uses pre-allocated arrays and loops which is faster than rows.map(r => [...r]).
+ */
+function clone2DArray<T>(rows: T[][]): T[][] {
+  const result: T[][] = new Array(rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let j = 0; j < len; j++) {
+      newRow[j] = row[j];
+    }
+    result[i] = newRow;
+  }
+  return result;
+}
+
+
 // ISO date string pattern (date-only or full datetime)
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 
@@ -243,7 +262,8 @@ export function applyDeltaEncoding(
 ): string[][] {
   if (rows.length === 0 || deltaColumns.length === 0) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  // ⚡ Bolt: Fast 2D array clone via pre-allocation and loops to avoid map/spread overhead
+  const result: string[][] = clone2DArray(rows);
 
   for (const deltaInfo of deltaColumns) {
     const col = deltaInfo.columnIndex;
@@ -293,7 +313,8 @@ export function applyRepeatEncoding(
 ): string[][] {
   if (rows.length < 2) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  // ⚡ Bolt: Fast 2D array clone via pre-allocation and loops to avoid map/spread overhead
+  const result: string[][] = clone2DArray(rows);
   const deltaColSet = new Set(deltaColumns.map(d => d.columnIndex));
 
   for (let col = 0; col < (rows[0]?.length ?? 0); col++) {
@@ -322,7 +343,8 @@ export function decodeDeltaRows(
 ): string[][] {
   if (rows.length === 0) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  // ⚡ Bolt: Fast 2D array clone via pre-allocation and loops to avoid map/spread overhead
+  const result: string[][] = clone2DArray(rows);
 
   for (const col of deltaColumns) {
     const isTemporal = temporalColumns?.has(col) ?? false;
@@ -401,7 +423,8 @@ export function decodeDeltaRows(
 export function decodeRepeatRows(rows: string[][]): string[][] {
   if (rows.length < 2) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  // ⚡ Bolt: Fast 2D array clone via pre-allocation and loops to avoid map/spread overhead
+  const result: string[][] = clone2DArray(rows);
 
   for (let col = 0; col < (rows[0]?.length ?? 0); col++) {
     for (let row = 1; row < result.length; row++) {
