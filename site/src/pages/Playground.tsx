@@ -138,18 +138,22 @@ export default function Playground() {
               onChange={e => handleCustomChange(e.target.value)}
               rows={8}
               spellCheck={false}
+              aria-invalid={!!customError}
+              aria-describedby="custom-json-feedback"
               className={`w-full font-mono text-sm px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 resize-y ${
                 customError
                   ? 'border-red-400 focus:ring-red-400'
                   : 'border-emerald-400 focus:ring-emerald-400'
               }`}
             />
-            {customError && (
-              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{customError}</p>
-            )}
-            {!customError && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Valid JSON</p>
-            )}
+            <div id="custom-json-feedback" aria-live="polite">
+              {customError && (
+                <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{customError}</p>
+              )}
+              {!customError && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Valid JSON</p>
+              )}
+            </div>
           </div>
         )}
       </div>

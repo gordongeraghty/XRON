@@ -1,0 +1,3 @@
+## 2024-05-03 - Added ARIA attributes to Playground custom JSON textarea validation
+**Learning:** Found an accessibility issue pattern in the app's components regarding inline validation feedback. Dynamic error and success messages were displayed directly to the DOM without using `aria-describedby` and `aria-live`, preventing screen readers from accurately reading the input state context when the validation output changed dynamically.
+**Action:** Next time when working on forms or input text areas with dynamically changing custom validation text, explicitly add `aria-invalid`, `aria-describedby` linking to a feedback container, and use `aria-live="polite"` to provide screen readers context and update events seamlessly.
