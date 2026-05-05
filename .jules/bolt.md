@@ -7,3 +7,6 @@
 ## 2024-05-30 - Array structural cloning strategies in V8
 **Learning:** For deep structural 2D array transformations (e.g. `rows.map(row => [...row])`), utilizing `Array.prototype.slice()` in an imperative `for` loop (e.g. `result[i] = rows[i].slice()`) provides significant measurable performance improvements (often ~20-30% faster) compared to spread syntax. It avoids both function instantiation via `.map()` and the V8 Iterator overhead associated with the spread syntax.
 **Action:** When performing 2D array deep copies or applying structural mappings along the serialization hot-path in `packages/format`, avoid `[...row]` and `Array.map()`. Instead, allocate arrays upfront (`new Array(len)`) and use `.slice()` combined with tightly bound `for` loops.
+## 2024-05-30 - O(N) array allocation overhead in data sampling
+**Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
+**Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
