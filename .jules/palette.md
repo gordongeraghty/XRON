@@ -1,0 +1,3 @@
+## 2024-05-07 - Interactive Toggle Accessibility
+**Learning:** Found multiple buttons acting as interactive toggles (Format selectors and "Highlight Tokens") that were only conveying state visually. Adding proper `aria-pressed` state immediately translates these complex visual states into semantic states for screen readers without altering existing layout or design rules.
+**Action:** For all future button components that represent an on/off state, enforce the use of `aria-pressed` and, when multiple buttons are functionally grouped, wrap them in a container with `role="group"` and `aria-label`.
