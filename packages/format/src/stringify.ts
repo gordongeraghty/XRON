@@ -291,14 +291,23 @@ function encode2DArray(
 
   // Encode each inner array as a row of values
   // Use encodeInlineValue for non-primitives (objects, arrays) to preserve structure
-  const rows: string[][] = arr.map(innerArr =>
-    innerArr.map(val => {
+  // ⚡ Bolt Optimization: Use pre-allocated arrays and imperative loops instead of
+  // Array.map() for O(1) allocation and faster iteration over large 2D arrays.
+  const rows: string[][] = new Array(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    const innerArr = arr[i];
+    const rowLen = innerArr.length;
+    const row: string[] = new Array(rowLen);
+    for (let j = 0; j < rowLen; j++) {
+      const val = innerArr[j];
       if (val !== null && typeof val === 'object') {
-        return encodeInlineValue(val, level, dictLookup, seen);
+        row[j] = encodeInlineValue(val, level, dictLookup, seen);
+      } else {
+        row[j] = encodePrimitive(val, level, dictLookup);
       }
-      return encodePrimitive(val, level, dictLookup);
-    })
-  );
+    }
+    rows[i] = row;
+  }
 
   // Apply dictionary-based compression at Level 2+
   if (level >= 2 && rows.length >= 2) {
