@@ -361,12 +361,26 @@ function encodeSchemaArray(
 
   // Compression Pipeline
   if (level >= 2 && rows.length >= 2) {
-    let parsed2D = rows.map(row => splitRow(row));
+    // ⚡ Bolt Optimization: Use pre-allocated arrays and imperative loops instead of
+    // Array.map() for O(1) allocation and faster iteration over large 2D arrays.
+    let parsed2D = new Array(rows.length);
+    for (let i = 0; i < rows.length; i++) {
+      parsed2D[i] = splitRow(rows[i]);
+    }
 
     // 1. Delta & Repeat Encoding (Level 3)
     let deltaColumnsInfo = [] as any[];
     if (level >= 3 && rows.length >= opts.deltaThreshold) {
-      const rawRows = arr.map(item => schema.fields.map(f => item[f]));
+      // ⚡ Bolt Optimization: Use pre-allocated arrays and imperative loops instead of Array.map()
+      const rawRows = new Array(arr.length);
+      for (let i = 0; i < arr.length; i++) {
+        const item = arr[i];
+        const row = new Array(schema.fields.length);
+        for (let j = 0; j < schema.fields.length; j++) {
+          row[j] = item[schema.fields[j]];
+        }
+        rawRows[i] = row;
+      }
       deltaColumnsInfo = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold);
       parsed2D = applyDeltaEncoding(parsed2D, deltaColumnsInfo);
       parsed2D = applyRepeatEncoding(parsed2D, deltaColumnsInfo);
