@@ -1,0 +1,34 @@
+--- packages/format/src/parse.ts
++++ packages/format/src/parse.ts
+@@ -418,6 +418,7 @@
+     const obj: Record<string, any> = {};
+     for (let i = 0; i < schema.fields.length; i++) {
+       const field = schema.fields[i];
++      // Prevent prototype pollution via special keys
+       if (field === '__proto__' || field === 'constructor') {
+         continue;
+       }
+@@ -483,6 +484,7 @@
+
+   for (let i = 0; i < schema.fields.length; i++) {
+     const field = schema.fields[i];
++    // Prevent prototype pollution via special keys
+     if (field === '__proto__' || field === 'constructor') {
+       continue;
+     }
+@@ -608,6 +610,7 @@
+     const key = unescapeValue(keyPart.trim());
+     const valuePart = valuePartRaw.trim();
+
++    // Prevent prototype pollution via special keys
+     if (key === '__proto__' || key === 'constructor') {
+       continue;
+     }
+@@ -709,6 +712,7 @@
+     const key = unescapeValue(keyPart.trim());
+     const rawVal = rawValPart.trim();
+
++    // Prevent prototype pollution via special keys
+     if (key === '__proto__' || key === 'constructor') {
+       continue;
+     }

@@ -439,6 +439,10 @@ function decodeSchemaRows(
     const obj: Record<string, any> = {};
     for (let i = 0; i < schema.fields.length; i++) {
       const field = schema.fields[i];
+      // Prevent prototype pollution via special keys
+      if (field === '__proto__' || field === 'constructor') {
+        continue;
+      }
       const raw = i < row.length ? row[i].trim() : '';
 
       // Check for nested schema reference
@@ -501,6 +505,10 @@ function decodeSchemaInstance(
 
   for (let i = 0; i < schema.fields.length; i++) {
     const field = schema.fields[i];
+    // Prevent prototype pollution via special keys
+    if (field === '__proto__' || field === 'constructor') {
+      continue;
+    }
     const raw = i < values.length ? values[i].trim() : '';
 
     // Check for nested schema reference
@@ -623,6 +631,11 @@ function parseKeyValueBlock(
     const key = unescapeValue(keyPart.trim());
     const valuePart = valuePartRaw.trim();
 
+    // Prevent prototype pollution via special keys
+    if (key === '__proto__' || key === 'constructor') {
+      continue;
+    }
+
     if (valuePart === '') {
       // Value is on next indented lines — collect nested block
       const nestedLines: string[] = [];
@@ -719,6 +732,11 @@ function parseInlineBracketObject(
     if (!keyPart) continue;
     const key = unescapeValue(keyPart.trim());
     const rawVal = rawValPart.trim();
+
+    // Prevent prototype pollution via special keys
+    if (key === '__proto__' || key === 'constructor') {
+      continue;
+    }
 
     if (rawVal.startsWith('{') && rawVal.endsWith('}')) {
       obj[key] = parseInlineBracketObject(rawVal, version, dictionary);
