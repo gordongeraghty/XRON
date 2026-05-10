@@ -182,7 +182,8 @@ export default function Playground() {
                 <div className="mt-2">
                   <button
                     onClick={() => setShowCaveats(v => !v)}
-                    className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 underline underline-offset-2 transition-colors"
+                    className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 underline underline-offset-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"
+                    aria-expanded={showCaveats}
                   >
                     {showCaveats ? 'Hide caveats' : `Show caveats (${recommendation.caveats.length})`}
                   </button>
