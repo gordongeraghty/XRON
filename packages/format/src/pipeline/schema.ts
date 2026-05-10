@@ -94,7 +94,7 @@ function collectShapes(
 
   const keys = Object.keys(value);
   if (keys.length >= 2) {
-    const signature = keys.slice().sort().join(',');
+    const signature = keys.sort().join(',');
     const existing = shapes.get(signature);
     if (existing) {
       existing.frequency++;
@@ -226,7 +226,7 @@ function resolveNestedSchemas(
         if (fieldValue !== null && typeof fieldValue === 'object' && !Array.isArray(fieldValue)) {
           const nestedKeys = Object.keys(fieldValue);
           if (nestedKeys.length >= 1) {
-            const nestedSig = nestedKeys.slice().sort().join(',');
+            const nestedSig = nestedKeys.sort().join(',');
             const nestedSchemaName = sigToSchema.get(nestedSig);
             if (nestedSchemaName) {
               if (matchedSchema === null) {
@@ -278,7 +278,7 @@ function collectInstances(value: any, signature: string, results: any[]): void {
   if (typeof value === 'object') {
     const keys = Object.keys(value);
     if (keys.length >= 1) {
-      const sig = keys.slice().sort().join(',');
+      const sig = keys.sort().join(',');
       if (sig === signature) {
         results.push(value);
       }
@@ -299,6 +299,6 @@ export function matchSchema(
 ): SchemaDefinition | null {
   const keys = Object.keys(obj);
   if (keys.length < 1) return null;
-  const signature = keys.slice().sort().join(',');
+  const signature = keys.sort().join(',');
   return schemas.get(signature) ?? null;
 }

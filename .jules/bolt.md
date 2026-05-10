@@ -11,3 +11,6 @@
 ## 2024-05-06 - Pre-allocated Array Loops in Parsing Pipelines
 **Learning:** In hot parsing pipelines handling 2D arrays (like XRON format decoder), replacing `Array.map()` with pre-allocated imperative `for` loops (`new Array(len)`) yields a significant micro-optimization by avoiding callback allocation and reducing GC overhead. Benchmarks showed a ~26% speedup for 10k row decoding.
 **Action:** When working in hot paths in `packages/format` parsing/encoding, default to pre-allocated arrays and imperative loops instead of functional map/filter paradigms.
+## 2024-05-31 - Removed slice before sort for array copying performance
+**Learning:** In hot path computations where `Object.keys()` is used, calling `.slice()` before `.sort()` is an unnecessary operation because `Object.keys()` always returns a new Array instance. This duplicate array allocation incurs an unnecessary small performance hit in Javascript applications with frequently executing routines like XRON's encoding loop.
+**Action:** Removed redundant `.slice()` after `Object.keys()` and before `.sort()` in array signature generations in `packages/format/src/pipeline/schema.ts`.
