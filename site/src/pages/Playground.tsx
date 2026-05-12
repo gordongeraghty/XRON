@@ -138,22 +138,18 @@ export default function Playground() {
               onChange={e => handleCustomChange(e.target.value)}
               rows={8}
               spellCheck={false}
-              aria-invalid={!!customError}
-              aria-describedby="custom-json-feedback"
               className={`w-full font-mono text-sm px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 resize-y ${
                 customError
                   ? 'border-red-400 focus:ring-red-400'
                   : 'border-emerald-400 focus:ring-emerald-400'
               }`}
             />
-            <div id="custom-json-feedback" aria-live="polite">
-              {customError && (
-                <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{customError}</p>
-              )}
-              {!customError && (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Valid JSON</p>
-              )}
-            </div>
+            {customError && (
+              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{customError}</p>
+            )}
+            {!customError && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Valid JSON</p>
+            )}
           </div>
         )}
       </div>
@@ -206,12 +202,13 @@ export default function Playground() {
       {/* Format toggles + controls row */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         {/* Format buttons */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Format selection">
           {ALL_FORMATS.map(fmt => (
             <button
               key={fmt}
               onClick={() => toggleFormat(fmt)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+              aria-pressed={activeFormats.includes(fmt)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900 ${
                 activeFormats.includes(fmt)
                   ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
                   : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400'
@@ -242,7 +239,8 @@ export default function Playground() {
           {/* Highlight tokens toggle */}
           <button
             onClick={() => setHighlightTokens(h => !h)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+            aria-pressed={highlightTokens}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900 ${
               highlightTokens
                 ? 'bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400'
                 : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-amber-400'
