@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2024-05-31 - Replaced Array.map and string reversal in longestCommonSuffix and longestCommonPrefix
+**Learning:** In string pipelines acting on large arrays of strings, `Array.map` combined with `[...s].reverse().join('')` to find a common suffix creates severe performance bottlenecks through massive array and string allocations. `longestCommonPrefix` using `slice(0, -1)` also created many intermediate string allocations.
+**Action:** Replaced functional string reversal logic and `slice` operations with iterative `for`/`while` loops counting matched characters from the ends (and starts) of strings directly in `longestCommonSuffix` and `longestCommonPrefix` within `packages/format/src/pipeline/column-template.ts`.
