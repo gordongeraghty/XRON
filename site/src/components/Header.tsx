@@ -10,7 +10,7 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
     <header className="sticky top-0 z-50 bg-gray-900 dark:bg-gray-900 border-b border-gray-700 dark:border-gray-800 shadow-lg">
       <div className="max-w-screen-xl mx-auto px-4 flex items-center justify-between h-14">
         {/* Logo */}
-        <NavLink to="/playground" className="flex items-center gap-2 no-underline">
+        <NavLink to="/playground" className="flex items-center gap-2 no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 rounded-md">
           <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center font-bold text-white text-sm select-none">
             X
           </div>
@@ -24,7 +24,7 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
           <NavLink
             to="/spec"
             className={({ isActive }) =>
-              `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+              `px-3 py-1.5 rounded text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
                 isActive
                   ? 'text-violet-400 bg-violet-900/40'
                   : 'text-gray-300 hover:text-white hover:bg-gray-800'
@@ -36,7 +36,7 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
           <NavLink
             to="/playground"
             className={({ isActive }) =>
-              `px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+              `px-3 py-1.5 rounded text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
                 isActive
                   ? 'text-violet-400 bg-violet-900/40'
                   : 'text-gray-300 hover:text-white hover:bg-gray-800'
@@ -51,7 +51,7 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
             href="https://github.com/gordoly/xron"
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-1 p-2 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="ml-1 p-2 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
             aria-label="GitHub"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -62,8 +62,9 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
           {/* Theme toggle */}
           <button
             onClick={onToggleDark}
-            className="ml-1 p-2 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="ml-1 p-2 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
             aria-label="Toggle dark mode"
+            aria-pressed={darkMode}
           >
             {darkMode ? (
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

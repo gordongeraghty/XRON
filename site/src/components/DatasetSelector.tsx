@@ -10,10 +10,11 @@ export default function DatasetSelector({ selectedId, onChange }: DatasetSelecto
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+      <label htmlFor="dataset-select" className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
         Dataset (Select One)
       </label>
       <select
+        id="dataset-select"
         value={selectedId}
         onChange={e => onChange(e.target.value)}
         className="w-full max-w-2xl px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
