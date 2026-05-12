@@ -80,7 +80,16 @@ export function parse(input: string, options?: XronOptions): unknown {
     // because the XRON output would have been larger than the JSON original.
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
-        return JSON.parse(trimmed);
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object') {
+          return JSON.parse(trimmed, (k, v) => {
+            if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+              return undefined;
+            }
+            return v;
+          });
+        }
+        return parsed;
       } catch {
         // Not valid JSON — fall through to XRON key-value parser
       }
@@ -632,7 +641,7 @@ function parseKeyValueBlock(
     const valuePart = valuePartRaw.trim();
 
     // Prevent prototype pollution via special keys
-    if (key === '__proto__' || key === 'constructor') {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
       continue;
     }
 
@@ -734,7 +743,7 @@ function parseInlineBracketObject(
     const rawVal = rawValPart.trim();
 
     // Prevent prototype pollution via special keys
-    if (key === '__proto__' || key === 'constructor') {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
       continue;
     }
 
