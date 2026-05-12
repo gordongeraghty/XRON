@@ -107,12 +107,16 @@ export default function Playground() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700" role="tablist" aria-label="Data source">
         {(['presets', 'custom'] as TabId[]).map(t => (
           <button
             key={t}
+            role="tab"
+            aria-selected={tab === t}
+            aria-controls={`tabpanel-${t}`}
+            id={`tab-${t}`}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors border-b-2 -mb-px ${
+            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors border-b-2 -mb-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
               tab === t
                 ? 'border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -124,7 +128,7 @@ export default function Playground() {
       </div>
 
       {/* Input section */}
-      <div className="mb-6">
+      <div className="mb-6" role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === 'presets' ? (
           <DatasetSelector selectedId={presetId} onChange={setPresetId} />
         ) : (
@@ -138,18 +142,22 @@ export default function Playground() {
               onChange={e => handleCustomChange(e.target.value)}
               rows={8}
               spellCheck={false}
+              aria-invalid={!!customError}
+              aria-describedby="custom-json-feedback"
               className={`w-full font-mono text-sm px-3 py-2 rounded-lg border bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 resize-y ${
                 customError
                   ? 'border-red-400 focus:ring-red-400'
                   : 'border-emerald-400 focus:ring-emerald-400'
               }`}
             />
-            {customError && (
-              <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{customError}</p>
-            )}
-            {!customError && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Valid JSON</p>
-            )}
+            <div id="custom-json-feedback" role={customError ? "alert" : undefined}>
+              {customError && (
+                <p className="text-xs text-red-500 dark:text-red-400 mt-0.5">{customError}</p>
+              )}
+              {!customError && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Valid JSON</p>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -178,13 +186,15 @@ export default function Playground() {
                 <div className="mt-2">
                   <button
                     onClick={() => setShowCaveats(v => !v)}
-                    className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 underline underline-offset-2 transition-colors"
+                    className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 underline underline-offset-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded"
+                    aria-expanded={showCaveats}
+                    aria-controls="caveats-list"
                   >
                     {showCaveats ? 'Hide caveats' : `Show caveats (${recommendation.caveats.length})`}
                   </button>
                   {showCaveats && (
-                    <ul className="mt-1.5 flex flex-col gap-1">
-                      {recommendation.caveats.map((c, i) => (
+                    <ul id="caveats-list" className="mt-1.5 flex flex-col gap-1">
+                      {recommendation.caveats.map((c: string, i: number) => (
                         <li key={i} className="text-xs text-indigo-600 dark:text-indigo-400 flex gap-1.5">
                           <span className="select-none shrink-0">⚠</span>
                           <span>{c}</span>
@@ -206,9 +216,9 @@ export default function Playground() {
           {ALL_FORMATS.map(fmt => (
             <button
               key={fmt}
-              onClick={() => toggleFormat(fmt)}
               aria-pressed={activeFormats.includes(fmt)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900 ${
+              onClick={() => toggleFormat(fmt)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
                 activeFormats.includes(fmt)
                   ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
                   : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400'
@@ -238,15 +248,15 @@ export default function Playground() {
 
           {/* Highlight tokens toggle */}
           <button
-            onClick={() => setHighlightTokens(h => !h)}
             aria-pressed={highlightTokens}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900 ${
+            onClick={() => setHighlightTokens(h => !h)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
               highlightTokens
                 ? 'bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400'
                 : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-amber-400'
             }`}
           >
-            <span className={`w-2 h-2 rounded-full inline-block ${highlightTokens ? 'bg-amber-500' : 'bg-gray-400'}`} />
+            <span className={`w-2 h-2 rounded-full inline-block ${highlightTokens ? 'bg-amber-500' : 'bg-gray-400'}`} aria-hidden="true" />
             Highlight Tokens
           </button>
         </div>
