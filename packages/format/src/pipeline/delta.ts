@@ -58,10 +58,9 @@ export function analyzeDeltaColumns(
   const deltaColumns: DeltaColumnInfo[] = [];
 
   for (let col = 0; col < schema.fields.length; col++) {
-    const len = rows.length;
-    const values = new Array(len);
-    for (let i = 0; i < len; i++) {
-      values[i] = rows[i][col];
+    const values = new Array(rows.length);
+    for (let r = 0; r < rows.length; r++) {
+      values[r] = rows[r][col];
     }
 
     // Check for temporal (ISO date string) sequential pattern first
@@ -96,8 +95,8 @@ function analyzeTemporalColumn(
 
   // Convert to epoch seconds
   const epochs: number[] = new Array(values.length);
-  for (let i = 0; i < values.length; i++) {
-    epochs[i] = Math.floor(new Date(values[i] as string).getTime() / 1000);
+  for (let r = 0; r < values.length; r++) {
+    epochs[r] = Math.floor(new Date(values[r] as string).getTime() / 1000);
   }
 
   // Verify all parsed correctly
@@ -159,8 +158,8 @@ function analyzeNumericColumn(
     if (!values.every(v => typeof v === 'bigint' || (typeof v === 'number' && isFinite(v)))) return null;
 
     const bigValues: bigint[] = new Array(values.length);
-    for (let i = 0; i < values.length; i++) {
-      bigValues[i] = BigInt(values[i] as number | bigint);
+    for (let r = 0; r < values.length; r++) {
+      bigValues[r] = BigInt(values[r] as number | bigint);
     }
     const deltas: bigint[] = [];
     for (let i = 1; i < bigValues.length; i++) {
@@ -253,10 +252,15 @@ export function applyDeltaEncoding(
 ): string[][] {
   if (rows.length === 0 || deltaColumns.length === 0) return rows;
 
-  const len = rows.length;
-  const result: string[][] = new Array(len);
-  for (let i = 0; i < len; i++) {
-    result[i] = rows[i].slice();
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
   }
 
   for (const deltaInfo of deltaColumns) {
@@ -307,11 +311,17 @@ export function applyRepeatEncoding(
 ): string[][] {
   if (rows.length < 2) return rows;
 
-  const len = rows.length;
-  const result: string[][] = new Array(len);
-  for (let i = 0; i < len; i++) {
-    result[i] = rows[i].slice();
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
   }
+
   const deltaColSet = new Set<number>();
   for (let i = 0; i < deltaColumns.length; i++) {
     deltaColSet.add(deltaColumns[i].columnIndex);
@@ -343,10 +353,15 @@ export function decodeDeltaRows(
 ): string[][] {
   if (rows.length === 0) return rows;
 
-  const len = rows.length;
-  const result: string[][] = new Array(len);
-  for (let i = 0; i < len; i++) {
-    result[i] = rows[i].slice();
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
   }
 
   for (const col of deltaColumns) {
@@ -426,10 +441,15 @@ export function decodeDeltaRows(
 export function decodeRepeatRows(rows: string[][]): string[][] {
   if (rows.length < 2) return rows;
 
-  const len = rows.length;
-  const result: string[][] = new Array(len);
-  for (let i = 0; i < len; i++) {
-    result[i] = rows[i].slice();
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
   }
 
   for (let col = 0; col < (rows[0]?.length ?? 0); col++) {
