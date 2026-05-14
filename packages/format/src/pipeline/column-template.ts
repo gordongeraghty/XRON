@@ -125,21 +125,42 @@ export function expandColumnTemplates(
 
 /** Find the longest common prefix of an array of strings */
 function longestCommonPrefix(strs: string[]): string {
+  // ⚡ Bolt Optimization: Use code-unit matching by index instead of
+  // `.slice(0, -1)` allocations and `.startsWith()` inside a nested loop.
+  // This safely handles emojis natively by comparing UTF-16 surrogates in sequence.
   if (strs.length === 0) return '';
-  let prefix = strs[0];
-  for (let i = 1; i < strs.length; i++) {
-    while (!strs[i].startsWith(prefix)) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === '') return '';
+  const firstStr = strs[0];
+  let prefixLen = 0;
+  while (prefixLen < firstStr.length) {
+    const char = firstStr[prefixLen];
+    for (let i = 1; i < strs.length; i++) {
+      if (prefixLen >= strs[i].length || strs[i][prefixLen] !== char) {
+        return prefixLen === 0 ? '' : firstStr.slice(0, prefixLen);
+      }
     }
+    prefixLen++;
   }
-  return prefix;
+  return firstStr.slice(0, prefixLen);
 }
 
 /** Find the longest common suffix of an array of strings */
 function longestCommonSuffix(strs: string[]): string {
+  // ⚡ Bolt Optimization: Calculate suffix matching backward dynamically to
+  // avoid massive allocations from mapping, spreading `[...s]`, `.reverse()`,
+  // and joining. Evaluates surrogate pairs perfectly via index iteration.
   if (strs.length === 0) return '';
-  const reversed = strs.map(s => [...s].reverse().join(''));
-  const revPrefix = longestCommonPrefix(reversed);
-  return [...revPrefix].reverse().join('');
+  const firstStr = strs[0];
+  const firstLen = firstStr.length;
+  let suffixLen = 0;
+  while (suffixLen < firstLen) {
+    const char = firstStr[firstLen - 1 - suffixLen];
+    for (let i = 1; i < strs.length; i++) {
+      const str = strs[i];
+      if (suffixLen >= str.length || str[str.length - 1 - suffixLen] !== char) {
+        return suffixLen === 0 ? '' : firstStr.slice(firstLen - suffixLen);
+      }
+    }
+    suffixLen++;
+  }
+  return suffixLen === 0 ? '' : firstStr.slice(firstLen - suffixLen);
 }
