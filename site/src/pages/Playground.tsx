@@ -97,7 +97,7 @@ export default function Playground() {
   }
 
   return (
-    <main className="max-w-screen-xl mx-auto px-4 py-8">
+    <main id="main-content" tabIndex={-1} className="max-w-screen-xl mx-auto px-4 py-8 focus:outline-none">
       {/* Page title */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Playground</h1>

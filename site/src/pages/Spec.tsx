@@ -1,6 +1,6 @@
 export default function Spec() {
   return (
-    <main className="max-w-4xl mx-auto px-4 py-10">
+    <main id="main-content" tabIndex={-1} className="max-w-4xl mx-auto px-4 py-10 focus:outline-none">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">XRON Format Specification</h1>
       <p className="text-gray-500 dark:text-gray-400 mb-8 text-sm">
         Extensible Reduced Object Notation — a lossless serialization format designed to minimize token consumption when communicating with large language models.

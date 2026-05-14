@@ -17,6 +17,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-violet-600 focus:text-white focus:font-semibold focus:rounded focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-2 focus:ring-offset-gray-900"
+      >
+        Skip to main content
+      </a>
       <Header darkMode={darkMode} onToggleDark={() => setDarkMode(d => !d)} />
       <Routes>
         <Route path="/" element={<Navigate to="/playground" replace />} />
