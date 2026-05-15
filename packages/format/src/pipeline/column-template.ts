@@ -126,20 +126,33 @@ export function expandColumnTemplates(
 /** Find the longest common prefix of an array of strings */
 function longestCommonPrefix(strs: string[]): string {
   if (strs.length === 0) return '';
-  let prefix = strs[0];
+  const first = strs[0];
+  let prefixLen = first.length;
   for (let i = 1; i < strs.length; i++) {
-    while (!strs[i].startsWith(prefix)) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === '') return '';
+    const s = strs[i];
+    let j = 0;
+    while (j < prefixLen && j < s.length && first[j] === s[j]) {
+      j++;
     }
+    prefixLen = j;
+    if (prefixLen === 0) return '';
   }
-  return prefix;
+  return first.slice(0, prefixLen);
 }
 
 /** Find the longest common suffix of an array of strings */
 function longestCommonSuffix(strs: string[]): string {
   if (strs.length === 0) return '';
-  const reversed = strs.map(s => [...s].reverse().join(''));
-  const revPrefix = longestCommonPrefix(reversed);
-  return [...revPrefix].reverse().join('');
+  const first = strs[0];
+  let suffixLen = first.length;
+  for (let i = 1; i < strs.length; i++) {
+    const s = strs[i];
+    let j = 0;
+    while (j < suffixLen && j < s.length && first[first.length - 1 - j] === s[s.length - 1 - j]) {
+      j++;
+    }
+    suffixLen = j;
+    if (suffixLen === 0) return '';
+  }
+  return first.slice(first.length - suffixLen);
 }

@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2024-06-03 - O(N*M) character-by-character string comparison overhead reduction
+**Learning:** For array-wide longest common prefix and suffix searches, mapping to character arrays, using `.reverse()`, calling `.slice()` sequentially, or using `.endsWith()` repeatedly introduces significant overhead and unnecessary allocations. A direct code-unit by code-unit comparison iteratively bounded by the current longest prefix/suffix performs up to 20x faster.
+**Action:** Replace `Array.map` spread operations, `.reverse()`, and excessive `String.slice` inside string prefix/suffix loops in `packages/format` with index-based code-unit loops checking from either direction.
