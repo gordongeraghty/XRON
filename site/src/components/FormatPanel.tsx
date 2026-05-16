@@ -117,6 +117,7 @@ export default function FormatPanel({
             ) : pctDiff !== null ? (
               <span className={pctDiff < 0 ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-500 dark:text-red-400 font-medium'}>
                 {pctDiff > 0 ? '+' : ''}{pctDiff.toFixed(1)}%
+                <span className="sr-only"> tokens vs baseline</span>
               </span>
             ) : null}
           </div>
