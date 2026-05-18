@@ -264,8 +264,19 @@ export default function Playground() {
 
       {/* Format panels */}
       {activeFormats.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 dark:text-gray-600 text-sm">
-          Select at least one format above to compare.
+        <div className="flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 mb-8">
+          <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 text-center max-w-sm">
+            Select at least one format above to compare token usage.
+          </p>
+          <button
+            onClick={() => setActiveFormats(DEFAULT_ACTIVE)}
+            className="px-4 py-2 bg-white dark:bg-gray-800 text-sm font-medium text-violet-600 dark:text-violet-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-violet-300 dark:hover:border-violet-700 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 shadow-sm"
+          >
+            Reset to default formats
+          </button>
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 mb-8">
