@@ -79,10 +79,7 @@ export function applyColumnTemplates(
   const result = new Array<string[]>(cells.length);
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
-    const newRow = new Array<string>(row.length);
-    for (let j = 0; j < row.length; j++) {
-      newRow[j] = row[j];
-    }
+    const newRow = row.slice();
     for (let j = 0; j < templates.length; j++) {
       const tmpl = templates[j];
       const val = newRow[tmpl.columnIndex] ?? '';
@@ -109,10 +106,7 @@ export function expandColumnTemplates(
   const result = new Array<string[]>(cells.length);
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
-    const newRow = new Array<string>(row.length);
-    for (let j = 0; j < row.length; j++) {
-      newRow[j] = row[j];
-    }
+    const newRow = row.slice();
     for (let j = 0; j < templates.length; j++) {
       const tmpl = templates[j];
       const variable = newRow[tmpl.columnIndex] ?? '';
