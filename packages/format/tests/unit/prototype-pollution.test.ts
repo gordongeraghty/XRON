@@ -14,4 +14,16 @@ describe('Prototype Pollution Prevention', () => {
     const result = XRON.parse(payload) as any;
     expect(({} as any).polluted).toBeUndefined();
   });
+
+  it('should ignore prototype in schema fields', () => {
+    const payload = `SCHEMA MySchema constructor prototype
+MySchema(
+  [1]
+  {"polluted": "yes"}
+)`;
+    const result = XRON.parse(payload) as any;
+    expect(({} as any).polluted).toBeUndefined();
+    // Validate the parsed object itself does not contain the 'prototype' key
+    expect(result[0].prototype).toBeUndefined();
+  });
 });
