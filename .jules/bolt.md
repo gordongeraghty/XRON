@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2025-02-12 - Longest Common Suffix Optimization
+**Learning:** In JavaScript, splitting strings into character arrays using the spread operator `[...str]` in order to safely evaluate UTF-16 surrogate pairs and run `.reverse()` causes severe memory allocation overhead and performance bottlenecks when used repeatedly within a loop (e.g. for common suffix detection). Array mappings combined with these spreads operate at $O(N)$ auxiliary space per string.
+**Action:** Replace `strs.map(s => [...s].reverse().join(''))` with imperative character-by-character comparison from the end of the strings (`str[str.length - j]`). To ensure UTF-16 surrogate pairs (like emojis) aren't improperly split across chunks, check if the calculated split point's code unit is a low surrogate (0xDC00 - 0xDFFF), and if so, back off by 1 code unit.
