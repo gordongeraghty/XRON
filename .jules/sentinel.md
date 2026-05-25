@@ -8,3 +8,8 @@
 **Vulnerability:** Prototype pollution was possible via `__proto__`, `constructor`, or `prototype` keys in XRON payloads — both inline and via JSON.parse fallback.
 **Learning:** Custom parsers need explicit key blocklists, and JSON.parse needs a reviver to strip dangerous keys from nested objects.
 **Prevention:** Block `__proto__`, `constructor`, `prototype` in all object-building paths; add JSON.parse reviver for the JSON fallback path.
+
+## 2024-05-25 - Prevent prototype pollution bypass via prototype key
+**Vulnerability:** Prototype pollution bypass was possible by using the `prototype` key alongside `__proto__` and `constructor` in schema row decoding paths.
+**Learning:** Checking for `__proto__` and `constructor` is insufficient because nested assignments can be achieved via `constructor.prototype`.
+**Prevention:** Always filter out `prototype` in addition to `__proto__` and `constructor` during object deserialization or assignment.
