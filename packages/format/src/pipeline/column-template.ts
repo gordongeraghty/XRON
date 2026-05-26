@@ -126,20 +126,56 @@ export function expandColumnTemplates(
 /** Find the longest common prefix of an array of strings */
 function longestCommonPrefix(strs: string[]): string {
   if (strs.length === 0) return '';
-  let prefix = strs[0];
+  const first = strs[0];
+  let maxLen = first.length;
   for (let i = 1; i < strs.length; i++) {
-    while (!strs[i].startsWith(prefix)) {
-      prefix = prefix.slice(0, -1);
-      if (prefix === '') return '';
+    const s = strs[i];
+    let j = 0;
+    while (j < maxLen && j < s.length && first[j] === s[j]) {
+      j++;
+    }
+    maxLen = j;
+    if (maxLen === 0) return '';
+  }
+
+  if (maxLen > 0) {
+    const lastCodeUnit = first.charCodeAt(maxLen - 1);
+    if (lastCodeUnit >= 0xD800 && lastCodeUnit <= 0xDBFF) {
+      maxLen--;
     }
   }
-  return prefix;
+
+  return first.slice(0, maxLen);
 }
 
 /** Find the longest common suffix of an array of strings */
 function longestCommonSuffix(strs: string[]): string {
   if (strs.length === 0) return '';
-  const reversed = strs.map(s => [...s].reverse().join(''));
-  const revPrefix = longestCommonPrefix(reversed);
-  return [...revPrefix].reverse().join('');
+  const first = strs[0];
+  let suffixLen = 0;
+  while (suffixLen < first.length) {
+    const char = first[first.length - 1 - suffixLen];
+    let allMatch = true;
+    for (let i = 1; i < strs.length; i++) {
+      const s = strs[i];
+      if (suffixLen >= s.length || s[s.length - 1 - suffixLen] !== char) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (!allMatch) break;
+    suffixLen++;
+  }
+  if (suffixLen === 0) return '';
+
+  let startIdx = first.length - suffixLen;
+  if (startIdx < first.length) {
+    const codeUnit = first.charCodeAt(startIdx);
+    if (codeUnit >= 0xDC00 && codeUnit <= 0xDFFF) {
+      suffixLen--;
+      startIdx++;
+    }
+  }
+
+  return first.slice(startIdx);
 }
