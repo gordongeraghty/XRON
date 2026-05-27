@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2024-05-31 - Replaced string spread and reverse with code-unit indexing in string comparisons
+**Learning:** For string prefix/suffix matching (e.g. `longestCommonSuffix`), using string spread syntax and `reverse()` (like `[...s].reverse().join('')`) creates immense memory allocations and O(N) operations. Index-based character comparisons (`str[i] === str2[i]`) are orders of magnitude faster.
+**Action:** Replaced array-spreading and iterative `.slice()` in `longestCommonPrefix` and `longestCommonSuffix` with imperative index-based iteration, keeping surrogate pairs safe by checking for high/low surrogates at the final split index.
