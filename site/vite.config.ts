@@ -7,7 +7,7 @@ export default defineConfig({
   base: './',
   resolve: {
     alias: {
-      '@xron': resolve(__dirname, '../src'),
+      '@xron': resolve(__dirname, '../packages/format/src'),
       'tiktoken': resolve(__dirname, 'src/stubs/tiktoken.ts')
     }
   },
