@@ -764,39 +764,39 @@ function parseInlineBracketObject(
  */
 function splitTopLevel(input: string): string[] {
   const parts: string[] = [];
-  let current = '';
   let depth = 0;
   let inQuotes = false;
-
   let isEscaped = false;
+  let startIndex = 0;
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
     
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '{' || ch === '[' || ch === '(')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === '}' || ch === ']' || ch === ')')) {
       depth--;
-      current += ch;
     } else if (ch === ',' && !inQuotes && depth === 0) {
-      parts.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+      parts.push(input.slice(startIndex, i).trim());
+      startIndex = i + 1;
     }
     isEscaped = false;
   }
-  if (current.trim()) parts.push(current.trim());
+
+  if (startIndex <= input.length) {
+    const last = input.slice(startIndex).trim();
+    if (last.length > 0) {
+      parts.push(last);
+    }
+  }
+
   return parts;
 }
 
