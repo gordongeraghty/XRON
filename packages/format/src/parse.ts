@@ -449,7 +449,7 @@ function decodeSchemaRows(
     for (let i = 0; i < schema.fields.length; i++) {
       const field = schema.fields[i];
       // Prevent prototype pollution via special keys
-      if (field === '__proto__' || field === 'constructor') {
+      if (field === '__proto__' || field === 'constructor' || field === 'prototype') {
         continue;
       }
       const raw = i < row.length ? row[i].trim() : '';
@@ -515,7 +515,7 @@ function decodeSchemaInstance(
   for (let i = 0; i < schema.fields.length; i++) {
     const field = schema.fields[i];
     // Prevent prototype pollution via special keys
-    if (field === '__proto__' || field === 'constructor') {
+    if (field === '__proto__' || field === 'constructor' || field === 'prototype') {
       continue;
     }
     const raw = i < values.length ? values[i].trim() : '';
