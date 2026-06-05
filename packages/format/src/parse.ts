@@ -764,7 +764,10 @@ function parseInlineBracketObject(
  */
 function splitTopLevel(input: string): string[] {
   const parts: string[] = [];
-  let current = '';
+  // ⚡ Bolt Optimization: Use start index and .slice() instead of character-by-character
+  // string concatenation (current += ch) to eliminate intermediate memory allocations
+  // and reduce garbage collection pressure.
+  let start = 0;
   let depth = 0;
   let inQuotes = false;
 
@@ -775,28 +778,26 @@ function splitTopLevel(input: string): string[] {
     
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '{' || ch === '[' || ch === '(')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === '}' || ch === ']' || ch === ')')) {
       depth--;
-      current += ch;
     } else if (ch === ',' && !inQuotes && depth === 0) {
-      parts.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+      parts.push(input.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
-  if (current.trim()) parts.push(current.trim());
+
+  const trailing = input.slice(start).trim();
+  if (trailing.length > 0) {
+    parts.push(trailing);
+  }
   return parts;
 }
 
