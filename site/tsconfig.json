@@ -8,10 +8,10 @@
     "strict": true,
     "noEmit": true,
     "paths": {
-      "@xron/*": ["../src/*"],
+      "@xron/*": ["../packages/format/src/*"],
       "tiktoken": ["./src/stubs/tiktoken.ts"]
     },
     "baseUrl": "."
   },
-  "include": ["src", "../src"]
+  "include": ["src", "../packages/format/src"]
 }
