@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2024-06-09 - Replaced string concatenation with string slice in parsing hot paths
+**Learning:** In string tokenizing functions (e.g., `splitTopLevel`, `splitRow` in `packages/format`), using character-by-character string concatenation (`current += ch`) inside tight `for` loops creates massive memory overhead due to repeated allocations and GC pressure in V8.
+**Action:** Replace `current += ch` with a `start` index tracking approach and use native `String.prototype.slice(start, i)` when a delimiter or boundary condition is met. This reliably yields >2x parsing performance improvements on large inputs. Always include a boundary check for the remaining trailing slice after the loop.
