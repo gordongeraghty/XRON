@@ -145,10 +145,9 @@ function detectTabSeparator(row: string): boolean {
 export function splitRow(row: string): string[] {
   const useTab = detectTabSeparator(row);
   const values: string[] = [];
-  let current = '';
+  let start = 0;
   let inQuotes = false;
   let depth = 0; // nesting depth for (), [], {}
-
   let isEscaped = false;
 
   for (let i = 0; i < row.length; i++) {
@@ -156,30 +155,27 @@ export function splitRow(row: string): string[] {
 
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
       depth--;
-      current += ch;
     } else if (useTab ? (ch === '\t' && !inQuotes && depth === 0) : (ch === ',' && !inQuotes && depth === 0)) {
-      values.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+      values.push(row.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
 
-  if (current.trim().length > 0) {
-    values.push(current.trim());
+  if (start < row.length) {
+    const last = row.slice(start).trim();
+    if (last.length > 0) {
+      values.push(last);
+    }
   }
 
   return values;
