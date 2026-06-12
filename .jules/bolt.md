@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2025-01-08 - Optimized string parsing loops avoiding char concatenation
+**Learning:** In hot parsing pipelines handling strings (like XRON unescaping and string splitting), character-by-character concatenation (`str += ch`) generates huge memory allocations and GC overhead in JS engines like V8. Also, frequently scanning for unescaped characters without a fast path wastes time when most inputs don't require escaping.
+**Action:** When manipulating strings in hot loops in parsing files (e.g. `parse.ts`, `escape.ts`), track string indices and use `String.prototype.slice(start, end)`. Furthermore, add an early-return fast path (`!str.includes('\\')`) before executing manual slice operations.
