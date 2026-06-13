@@ -50,6 +50,7 @@ export function unescapeValue(value: string): string {
     return value;
   }
   const inner = value.slice(1, -1);
+  if (!inner.includes('\\')) return inner;
   let result = '';
   for (let i = 0; i < inner.length; i++) {
     if (inner[i] === '\\' && i + 1 < inner.length) {
