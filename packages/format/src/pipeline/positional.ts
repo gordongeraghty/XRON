@@ -144,42 +144,37 @@ function detectTabSeparator(row: string): boolean {
  */
 export function splitRow(row: string): string[] {
   const useTab = detectTabSeparator(row);
+  const sep = useTab ? '\t' : ',';
   const values: string[] = [];
-  let current = '';
   let inQuotes = false;
   let depth = 0; // nesting depth for (), [], {}
-
   let isEscaped = false;
+  let start = 0;
 
   for (let i = 0; i < row.length; i++) {
     const ch = row[i];
 
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
       depth--;
-      current += ch;
-    } else if (useTab ? (ch === '\t' && !inQuotes && depth === 0) : (ch === ',' && !inQuotes && depth === 0)) {
-      values.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+    } else if (ch === sep && !inQuotes && depth === 0) {
+      values.push(row.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
 
-  if (current.trim().length > 0) {
-    values.push(current.trim());
+  const lastPart = row.slice(start).trim();
+  if (lastPart.length > 0) {
+    values.push(lastPart);
   }
 
   return values;
