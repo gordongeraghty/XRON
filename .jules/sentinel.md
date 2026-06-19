@@ -12,3 +12,7 @@
 **Vulnerability:** Missing filter for the `prototype` key in `decodeSchemaRows` and `decodeSchemaInstance`.
 **Learning:** Prototype pollution bypasses can occur when objects are instantiated and populated by bypassing `__proto__` and `constructor` but not `prototype` during deep property assignment.
 **Prevention:** Always filter out `prototype` along with `__proto__` and `constructor` during object deserialization and assignment.
+## 2024-05-24 - Missing JSON.parse Reviver in Integrations
+**Vulnerability:** Prototype pollution bypass through missing reviver in JSON.parse across CLI, MCP, and Site.
+**Learning:** JSON.parse without a reviver allows object pollution if parsing attacker-controlled inputs, even if custom parsers are secure.
+**Prevention:** Always use a reviver when using JSON.parse on untrusted inputs.

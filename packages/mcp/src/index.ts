@@ -80,7 +80,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const trimmed = item.text.trim();
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
           try {
-            const parsed = JSON.parse(trimmed);
+            const parsed = JSON.parse(trimmed, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype') ? undefined : v);
             const compressed = XRON.stringify(parsed, { level: "auto" });
             return {
               type: "text" as const,

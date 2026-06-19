@@ -79,7 +79,7 @@ async function compress(file: string | undefined, output: string | undefined) {
   const raw = await readInput(file);
   let data: unknown;
   try {
-    data = JSON.parse(raw);
+    data = JSON.parse(raw, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype') ? undefined : v);
   } catch {
     die(`Failed to parse JSON from ${file ?? 'stdin'}`);
   }
@@ -98,7 +98,7 @@ async function analyzeFile(file: string | undefined, exactTokens = false) {
   const raw = await readInput(file);
   let data: unknown;
   try {
-    data = JSON.parse(raw);
+    data = JSON.parse(raw, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype') ? undefined : v);
   } catch {
     die(`Failed to parse JSON from ${file ?? 'stdin'}`);
   }

@@ -26,7 +26,7 @@ export default function Playground() {
       return preset ? preset.data() : null
     } else {
       try {
-        return JSON.parse(customJson)
+        return JSON.parse(customJson, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype') ? undefined : v)
       } catch {
         return null
       }
@@ -36,7 +36,7 @@ export default function Playground() {
   const handleCustomChange = useCallback((val: string) => {
     setCustomJson(val)
     try {
-      JSON.parse(val)
+      JSON.parse(val, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype') ? undefined : v)
       setCustomError(null)
     } catch (e: unknown) {
       setCustomError(e instanceof Error ? e.message : 'Invalid JSON')
