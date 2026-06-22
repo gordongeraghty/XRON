@@ -445,7 +445,7 @@ function decodeSchemaRows(
   // Convert cells back to objects
   const items: unknown[] = [];
   for (const row of cells) {
-    const obj: Record<string, unknown> = {};
+    const obj: Record<string, unknown> = Object.create(null);
     for (let i = 0; i < schema.fields.length; i++) {
       const field = schema.fields[i];
       // Prevent prototype pollution via special keys
@@ -510,7 +510,7 @@ function decodeSchemaInstance(
   dictionary: string[],
 ): Record<string, unknown> {
   const values = splitRow(argsStr);
-  const obj: Record<string, unknown> = {};
+  const obj: Record<string, unknown> = Object.create(null);
 
   for (let i = 0; i < schema.fields.length; i++) {
     const field = schema.fields[i];
@@ -628,7 +628,7 @@ function parseKeyValueBlock(
   schemasByName: Map<string, SchemaDefinition>,
 ): unknown {
   const lines = input.split('\n');
-  const result: Record<string, any> = {};
+  const result: Record<string, any> = Object.create(null);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -733,7 +733,7 @@ function parseInlineBracketObject(
   const inner = line.slice(1, -1).trim();
   if (inner === '') return {};
 
-  const obj: Record<string, unknown> = {};
+  const obj: Record<string, unknown> = Object.create(null);
   const pairs = splitTopLevel(inner);
 
   for (const pair of pairs) {

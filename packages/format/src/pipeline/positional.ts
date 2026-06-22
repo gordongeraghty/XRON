@@ -75,7 +75,7 @@ export function decodePositionalRows(
 
   for (const row of rows) {
     const rawValues = splitRow(row);
-    const obj: Record<string, any> = {};
+    const obj: Record<string, any> = Object.create(null);
 
     for (let i = 0; i < schema.fields.length; i++) {
       const field = schema.fields[i];
@@ -88,7 +88,7 @@ export function decodePositionalRows(
         const nestedSchema = findSchemaByName(allSchemas, nestedSchemaName);
         if (nestedSchema) {
           const nestedValues = splitRow(nestedMatch[2]);
-          const nestedObj: Record<string, any> = {};
+          const nestedObj: Record<string, any> = Object.create(null);
           for (let j = 0; j < nestedSchema.fields.length; j++) {
             const nField = nestedSchema.fields[j];
             const nRaw = j < nestedValues.length ? nestedValues[j].trim() : '';

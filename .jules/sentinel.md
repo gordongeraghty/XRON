@@ -12,3 +12,7 @@
 **Vulnerability:** Missing filter for the `prototype` key in `decodeSchemaRows` and `decodeSchemaInstance`.
 **Learning:** Prototype pollution bypasses can occur when objects are instantiated and populated by bypassing `__proto__` and `constructor` but not `prototype` during deep property assignment.
 **Prevention:** Always filter out `prototype` along with `__proto__` and `constructor` during object deserialization and assignment.
+## 2025-02-20 - Prototype Pollution Bypass via Nested Assignment
+**Vulnerability:** The XRON parser filters __proto__ and constructor keys to prevent prototype pollution, but initializes deserialized objects with {} (which inherits from Object.prototype). This allows attackers to bypass filters by providing nested structures like {constructor: {prototype: {polluted: "yes"}}}.
+**Learning:** Checking keys at the top-level string parsing phase is insufficient if the constructed objects inherit from Object.prototype, as nested assignments can still traverse the prototype chain.
+**Prevention:** Always initialize objects created during parsing/deserialization with Object.create(null) to ensure they have no prototype chain, making prototype pollution impossible regardless of nested payloads.
