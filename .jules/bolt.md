@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2024-05-31 - String spreading memory overhead and surrogate handling in suffix matching
+**Learning:** In string suffix matching loops, using spread operations like `[...str].reverse()` causes severe memory overhead and O(N) array allocation. Using native `.endsWith()` with `.slice()` is substantially faster but can improperly split UTF-16 surrogate pairs (like emojis) during string trimming operations.
+**Action:** Replace `[...str].reverse()` approaches with native `.endsWith()` and imperative string slicing. However, when slicing to trim suffixes or prefixes, ensure surrogate pairs are preserved: if matching from the front and splitting on a high surrogate (0xD800 - 0xDBFF), or from the end and splitting on a low surrogate (0xDC00 - 0xDFFF), back off the slice by 1 code unit.
