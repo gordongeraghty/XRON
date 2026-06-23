@@ -264,8 +264,15 @@ export default function Playground() {
 
       {/* Format panels */}
       {activeFormats.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 dark:text-gray-600 text-sm">
-          Select at least one format above to compare.
+        <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-600 text-sm border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl mb-8">
+          <span className="text-2xl mb-2" aria-hidden="true">📊</span>
+          <p className="mb-4">Select at least one format above to compare.</p>
+          <button
+            onClick={() => setActiveFormats(DEFAULT_ACTIVE)}
+            className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 font-medium"
+          >
+            Reset to defaults
+          </button>
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 mb-8">
