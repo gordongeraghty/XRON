@@ -34,6 +34,7 @@ export function encodePositionalRows(
     const values: string[] = [];
     for (let i = 0; i < schema.fields.length; i++) {
       const field = schema.fields[i];
+      if (field === '__proto__' || field === 'constructor' || field === 'prototype') continue;
       const value = item[field];
       const nestedSchemaName = schema.nestedSchemas.get(i);
 
@@ -79,6 +80,7 @@ export function decodePositionalRows(
 
     for (let i = 0; i < schema.fields.length; i++) {
       const field = schema.fields[i];
+      if (field === '__proto__' || field === 'constructor' || field === 'prototype') continue;
       const raw = i < rawValues.length ? rawValues[i].trim() : '';
 
       // Check for nested schema reference: SchemaName(val1, val2, ...)
@@ -91,6 +93,7 @@ export function decodePositionalRows(
           const nestedObj: Record<string, any> = {};
           for (let j = 0; j < nestedSchema.fields.length; j++) {
             const nField = nestedSchema.fields[j];
+            if (nField === '__proto__' || nField === 'constructor' || nField === 'prototype') continue;
             const nRaw = j < nestedValues.length ? nestedValues[j].trim() : '';
             nestedObj[nField] = decodeValue(nRaw, allSchemas, dictionary);
           }
