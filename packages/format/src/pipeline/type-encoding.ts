@@ -225,20 +225,26 @@ export function base62ToUuid(b62: string): string {
  */
 function unescapeQuoted(value: string): string {
   const inner = value.slice(1, -1);
+  if (!inner.includes('\\')) return inner;
+
   let result = '';
+  let start = 0;
   for (let i = 0; i < inner.length; i++) {
     if (inner[i] === '\\' && i + 1 < inner.length) {
-      switch (inner[i + 1]) {
-        case '\\': result += '\\'; i++; break;
-        case '"': result += '"'; i++; break;
-        case 'n': result += '\n'; i++; break;
-        case 'r': result += '\r'; i++; break;
-        case 't': result += '\t'; i++; break;
-        default: result += '\\' + inner[i + 1]; i++; break;
+      result += inner.slice(start, i);
+      const next = inner[i + 1];
+      switch (next) {
+        case '\\': result += '\\'; break;
+        case '"': result += '"'; break;
+        case 'n': result += '\n'; break;
+        case 'r': result += '\r'; break;
+        case 't': result += '\t'; break;
+        default: result += '\\' + next; break;
       }
-    } else {
-      result += inner[i];
+      i++;
+      start = i + 1;
     }
   }
+  result += inner.slice(start);
   return result;
 }
