@@ -143,9 +143,10 @@ function detectTabSeparator(row: string): boolean {
  * Auto-detects whether the row uses tab or comma separators.
  */
 export function splitRow(row: string): string[] {
+  // Track indices and use slice() instead of string concatenation for performance
   const useTab = detectTabSeparator(row);
   const values: string[] = [];
-  let current = '';
+  let start = 0;
   let inQuotes = false;
   let depth = 0; // nesting depth for (), [], {}
 
@@ -156,30 +157,25 @@ export function splitRow(row: string): string[] {
 
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
       depth--;
-      current += ch;
     } else if (useTab ? (ch === '\t' && !inQuotes && depth === 0) : (ch === ',' && !inQuotes && depth === 0)) {
-      values.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+      values.push(row.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
 
-  if (current.trim().length > 0) {
-    values.push(current.trim());
+  const last = row.slice(start).trim();
+  if (last.length > 0) {
+    values.push(last);
   }
 
   return values;
