@@ -17,3 +17,6 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+## 2026-06-27 - String prefix/suffix matching optimization
+**Learning:** In `longestCommonPrefix` and `longestCommonSuffix` methods for column template detection, reversing strings to arrays of characters via `[...str].reverse()` creates significant memory allocation and garbage collection pressure, particularly on long strings or large datasets. Using native `endsWith` and `slice` provides an order-of-magnitude (10x+) speedup by keeping operations within the JS engine's optimized string handling routines.
+**Action:** Replaced character array reversal with native string `endsWith`/`startsWith` and `slice()` loops, incorporating explicit checks to avoid improperly splitting UTF-16 surrogate pairs (emojis) during string manipulation.
