@@ -764,39 +764,36 @@ function parseInlineBracketObject(
  */
 function splitTopLevel(input: string): string[] {
   const parts: string[] = [];
-  let current = '';
   let depth = 0;
   let inQuotes = false;
-
   let isEscaped = false;
+  let start = 0;
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
     
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '{' || ch === '[' || ch === '(')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === '}' || ch === ']' || ch === ')')) {
       depth--;
-      current += ch;
     } else if (ch === ',' && !inQuotes && depth === 0) {
-      parts.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+      parts.push(input.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
-  if (current.trim()) parts.push(current.trim());
+
+  if (start < input.length) {
+    const lastPart = input.slice(start).trim();
+    if (lastPart) parts.push(lastPart);
+  }
   return parts;
 }
 
@@ -804,6 +801,11 @@ function splitTopLevel(input: string): string[] {
  * Split a key-value pair at the first colon outside of quotes.
  */
 function splitKeyValue(str: string): [string, string] {
+  if (!str.includes('"')) {
+    const idx = str.indexOf(':');
+    if (idx !== -1) return [str.slice(0, idx), str.slice(idx + 1)];
+    return ['', ''];
+  }
   let inQuotes = false;
   let isEscaped = false;
 
