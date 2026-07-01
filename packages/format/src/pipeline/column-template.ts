@@ -133,13 +133,32 @@ function longestCommonPrefix(strs: string[]): string {
       if (prefix === '') return '';
     }
   }
+  // Ensure we don't split a surrogate pair: if the last char is a high surrogate, remove it
+  if (prefix.length > 0) {
+    const lastCode = prefix.charCodeAt(prefix.length - 1);
+    if (lastCode >= 0xD800 && lastCode <= 0xDBFF) {
+      prefix = prefix.slice(0, -1);
+    }
+  }
   return prefix;
 }
 
 /** Find the longest common suffix of an array of strings */
 function longestCommonSuffix(strs: string[]): string {
   if (strs.length === 0) return '';
-  const reversed = strs.map(s => [...s].reverse().join(''));
-  const revPrefix = longestCommonPrefix(reversed);
-  return [...revPrefix].reverse().join('');
+  let suffix = strs[0];
+  for (let i = 1; i < strs.length; i++) {
+    while (!strs[i].endsWith(suffix)) {
+      suffix = suffix.slice(1);
+      if (suffix === '') return '';
+    }
+  }
+  // Ensure we don't split a surrogate pair: if the first char is a low surrogate, remove it
+  if (suffix.length > 0) {
+    const firstCode = suffix.charCodeAt(0);
+    if (firstCode >= 0xDC00 && firstCode <= 0xDFFF) {
+      suffix = suffix.slice(1);
+    }
+  }
+  return suffix;
 }
