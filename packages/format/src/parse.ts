@@ -764,7 +764,7 @@ function parseInlineBracketObject(
  */
 function splitTopLevel(input: string): string[] {
   const parts: string[] = [];
-  let current = '';
+  let start = 0;
   let depth = 0;
   let inQuotes = false;
 
@@ -775,28 +775,25 @@ function splitTopLevel(input: string): string[] {
     
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '{' || ch === '[' || ch === '(')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === '}' || ch === ']' || ch === ')')) {
       depth--;
-      current += ch;
     } else if (ch === ',' && !inQuotes && depth === 0) {
-      parts.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+      parts.push(input.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
-  if (current.trim()) parts.push(current.trim());
+  if (start < input.length) {
+    const remaining = input.slice(start).trim();
+    if (remaining.length > 0) parts.push(remaining);
+  }
   return parts;
 }
 
@@ -825,11 +822,13 @@ function splitKeyValue(str: string): [string, string] {
 
 import { unescapeValue } from './format/escape.js';
 
+// @ts-ignore
 export async function* parseStream(input: AsyncIterable<string> | AsyncIterable<Buffer>, options?: XronOptions): AsyncIterable<unknown> {
-    let fullInput = '';
+    const chunks: string[] = [];
     for await (const chunk of input) {
-        fullInput += chunk;
+        chunks.push(chunk.toString());
     }
+    const fullInput = chunks.join('');
     const result = parse(fullInput, options);
     if (Array.isArray(result)) {
         for (const item of result) {
