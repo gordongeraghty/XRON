@@ -17,3 +17,8 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+
+## 2026-07-04 - Replace RegEx in Substring Dict Expansion
+**Learning:** In substring dictionary pipelines, `String.prototype.replace` with RegEx and callbacks creates significant memory allocation and garbage collection pressure in JS engines. Iterators (`for...of`) over dictionaries and `Map` allocations also measurably overhead tight loops.
+**Action:** Use imperative substring scanning with `indexOf('%')` and manual `charCodeAt` checks combined with pre-allocated `Array` lookups in hot text substitution paths.

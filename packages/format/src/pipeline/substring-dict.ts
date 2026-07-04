@@ -149,13 +149,23 @@ export function applySubstringRefs(
 
       // Escape existing literal % → %% before any substitution
       let escaped = cell;
-      if (cell.indexOf('%') !== -1) {
-        escaped = cell.replace(/%/g, '%%');
+      let pos = cell.indexOf('%');
+      if (pos !== -1) {
+        let res = '';
+        let start = 0;
+        while (pos !== -1) {
+          res += cell.slice(start, pos) + '%%';
+          start = pos + 1;
+          pos = cell.indexOf('%', start);
+        }
+        res += cell.slice(start);
+        escaped = res;
       }
 
       // Try each substring entry (longest first)
       let replaced = false;
-      for (const entry of sorted) {
+      for (let k = 0; k < sorted.length; k++) {
+        const entry = sorted[k];
         const idx = escaped.indexOf(entry.value);
         if (idx !== -1) {
           // Replace the FIRST occurrence only — use %N; format (semicolon-terminated)
@@ -187,37 +197,78 @@ export function expandSubstringRefs(
 ): string[][] {
   if (substringDict.length === 0) return cells;
 
-  // Build lookup: index → value
-  const lookup = new Map<number, string>();
-  for (const entry of substringDict) {
-    lookup.set(entry.index, entry.value);
+  let maxIndex = -1;
+  for (let i = 0; i < substringDict.length; i++) {
+    if (substringDict[i].index > maxIndex) {
+      maxIndex = substringDict[i].index;
+    }
+  }
+
+  // Build lookup: index → value using pre-allocated array instead of Map
+  const lookup = new Array<string | undefined>(maxIndex + 1);
+  for (let i = 0; i < substringDict.length; i++) {
+    const entry = substringDict[i];
+    lookup[entry.index] = entry.value;
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
     const newRow = new Array<string>(row.length);
     for (let j = 0; j < row.length; j++) {
       const cell = row[j];
+
       if (!cell || cell.indexOf('%') === -1) {
         newRow[j] = cell;
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      let res = '';
+      let start = 0;
+      let pos = 0;
+      const len = cell.length;
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
+      while (pos < len) {
+        pos = cell.indexOf('%', pos);
+        if (pos === -1) {
+          if (start < len) res += cell.slice(start, len);
+          break;
+        }
 
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+        // Handle escaped %%
+        if (pos + 1 < len && cell[pos + 1] === '%') {
+          res += cell.slice(start, pos + 1); // add up to and including the first %
+          pos += 2;
+          start = pos;
+        } else {
+          // Look for closing semicolon
+          let semiPos = cell.indexOf(';', pos + 1);
+          if (semiPos !== -1) {
+            // Check if all characters between % and ; are digits
+            let isDigits = semiPos > pos + 1;
+            for (let k = pos + 1; k < semiPos; k++) {
+                const c = cell.charCodeAt(k);
+                if (c < 48 || c > 57) {
+                    isDigits = false;
+                    break;
+                }
+            }
+            if (isDigits) {
+              const index = parseInt(cell.slice(pos + 1, semiPos), 10);
+              const val = lookup[index];
+              if (val !== undefined) {
+                res += cell.slice(start, pos) + val; // Add text before %
+                pos = semiPos + 1;
+                start = pos;
+                continue;
+              }
+            }
+          }
+          // Not a valid ref, keep looking
+          pos++;
+        }
+      }
 
       newRow[j] = res;
     }
