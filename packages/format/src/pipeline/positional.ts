@@ -145,7 +145,9 @@ function detectTabSeparator(row: string): boolean {
 export function splitRow(row: string): string[] {
   const useTab = detectTabSeparator(row);
   const values: string[] = [];
-  let current = '';
+  // Performance optimization: Avoid character-by-character string concatenation (current += ch)
+  // by tracking start index and using native String.slice() for reduced garbage collection.
+  let start = 0;
   let inQuotes = false;
   let depth = 0; // nesting depth for (), [], {}
 
@@ -156,30 +158,25 @@ export function splitRow(row: string): string[] {
 
     if (ch === '\\' && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
     if (ch === '"' && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
     } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
       depth++;
-      current += ch;
     } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
       depth--;
-      current += ch;
     } else if (useTab ? (ch === '\t' && !inQuotes && depth === 0) : (ch === ',' && !inQuotes && depth === 0)) {
-      values.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+      values.push(row.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
 
-  if (current.trim().length > 0) {
-    values.push(current.trim());
+  const trailing = row.slice(start).trim();
+  if (trailing.length > 0) {
+    values.push(trailing);
   }
 
   return values;

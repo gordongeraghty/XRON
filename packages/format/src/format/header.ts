@@ -148,6 +148,23 @@ export function parseSubstringDictHeader(line: string): string[] | null {
  * Handles escaped quotes (\") and backslashes (\\) within quoted values.
  */
 export function parseDictValues(input: string): string[] {
+  // Performance optimization: Avoid character-by-character string concatenation for headers
+  // by using a fast path and String.slice() combined with replace for escapes.
+  if (!input.includes('"') && !input.includes('\\')) {
+    // Fast path for unquoted/unescaped values
+    const parts = [];
+    let start = 0;
+    for (let i = 0; i < input.length; i++) {
+      if (input[i] === ',') {
+        parts.push(input.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+    const trailing = input.slice(start).trim();
+    if (trailing.length > 0) parts.push(trailing);
+    return parts;
+  }
+
   const values: string[] = [];
   let current = '';
   let inQuotes = false;
