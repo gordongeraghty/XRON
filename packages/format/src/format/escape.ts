@@ -50,9 +50,13 @@ export function unescapeValue(value: string): string {
     return value;
   }
   const inner = value.slice(1, -1);
+  if (!inner.includes('\\')) return inner;
+
   let result = '';
+  let start = 0;
   for (let i = 0; i < inner.length; i++) {
     if (inner[i] === '\\' && i + 1 < inner.length) {
+      result += inner.slice(start, i);
       const next = inner[i + 1];
       switch (next) {
         case '\\': result += '\\'; i++; break;
@@ -62,9 +66,11 @@ export function unescapeValue(value: string): string {
         case 't': result += '\t'; i++; break;
         default: result += '\\' + next; i++; break;
       }
-    } else {
-      result += inner[i];
+      start = i + 1;
     }
+  }
+  if (start < inner.length) {
+    result += inner.slice(start);
   }
   return result;
 }
