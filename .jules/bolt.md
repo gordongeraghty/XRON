@@ -17,3 +17,7 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+## 2024-06-03 - String replacement optimization using imperative scan and pre-allocated arrays
+**Learning:** In hot parsing pipelines, `String.prototype.replace` with regular expressions (e.g., `res.replace(/%(\d+);/g, ...)` and `res.replace(/%%/g, sentinel)`) creates immense overhead through Regex execution, callback invocation, and multiple string reallocations. A manual string iteration checking substring indices and parsing integers from char codes can result in significant speedups (e.g., ~1.9s to ~240ms in a benchmark).
+**Action:** When performing substring or placeholder substitutions on large text datasets (like in `expandSubstringRefs` in `packages/format`), avoid regex replacements. Instead, use an imperative `while` loop with `indexOf` and manual `charCodeAt` checks to achieve maximum performance.

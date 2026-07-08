@@ -188,14 +188,13 @@ export function expandSubstringRefs(
   if (substringDict.length === 0) return cells;
 
   // Build lookup: index → value
+  // We use a Map to avoid massive array allocations for sparse/large indices
   const lookup = new Map<number, string>();
   for (const entry of substringDict) {
     lookup.set(entry.index, entry.value);
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
@@ -207,17 +206,55 @@ export function expandSubstringRefs(
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      let res = '';
+      let k = 0;
+      const len = cell.length;
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
+      while (k < len) {
+        const idx = cell.indexOf('%', k);
+        if (idx === -1) {
+          res += cell.slice(k);
+          break;
+        }
 
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+        res += cell.slice(k, idx);
+
+        if (idx + 1 < len && cell.charCodeAt(idx + 1) === 37) { // 37 is '%'
+          res += '%';
+          k = idx + 2;
+          continue;
+        }
+
+        // Scan characters strictly sequentially to find the integer index
+        let p = idx + 1;
+        let indexVal = 0;
+        let isNum = false;
+
+        while (p < len) {
+          const code = cell.charCodeAt(p);
+          if (code >= 48 && code <= 57) { // '0' - '9'
+            indexVal = indexVal * 10 + (code - 48);
+            isNum = true;
+            p++;
+          } else {
+            break;
+          }
+        }
+
+        // Check if a number was followed by a semicolon
+        if (isNum && p < len && cell.charCodeAt(p) === 59) { // 59 is ';'
+          const expanded = lookup.get(indexVal);
+          if (expanded !== undefined) {
+            res += expanded;
+            k = p + 1; // Skip past the semicolon
+            continue;
+          }
+        }
+
+        // If not %% and not valid %N; just output %
+        res += '%';
+        k = idx + 1;
+      }
 
       newRow[j] = res;
     }
