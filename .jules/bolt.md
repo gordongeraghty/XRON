@@ -17,3 +17,8 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+
+## 2024-10-24 - Replace Regex with Imperative String Parsing
+**Learning:** In hot text substitution paths (like dictionary expansion), `String.prototype.replace` with RegEx and sentinel strings causes massive overhead and garbage collection pressure, taking ~1900ms in hot paths with 10k items.
+**Action:** Replace `String.prototype.replace` with RegEx usage with imperative substring scanning loops using `indexOf('%')` and manual `charCodeAt` checks. This prevents allocating the sentinel array, cuts out RegEx completely, handles `%%` efficiently by direct checks, and drops execution time significantly.

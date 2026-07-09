@@ -194,8 +194,6 @@ export function expandSubstringRefs(
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
@@ -207,17 +205,54 @@ export function expandSubstringRefs(
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      let res = '';
+      let start = 0;
+      let pos = 0;
+      const len = cell.length;
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
+      while (pos < len) {
+        const idx = cell.indexOf('%', pos);
+        if (idx === -1) {
+          res += cell.slice(start);
+          break;
+        }
 
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+        // We found a '%'
+        if (idx + 1 < len && cell.charCodeAt(idx + 1) === 37) { // '%'
+          res += cell.slice(start, idx) + '%';
+          pos = idx + 2;
+          start = pos;
+        } else {
+          // Look for ';'
+          const semiIdx = cell.indexOf(';', idx + 1);
+          if (semiIdx !== -1) {
+            // Check if it's all digits
+            let isNum = true;
+            for (let k = idx + 1; k < semiIdx; k++) {
+              const code = cell.charCodeAt(k);
+              if (code < 48 || code > 57) {
+                isNum = false;
+                break;
+              }
+            }
+            if (isNum && semiIdx > idx + 1) {
+              const numStr = cell.slice(idx + 1, semiIdx);
+              const num = parseInt(numStr, 10);
+              const val = lookup.get(num);
+              if (val !== undefined) {
+                res += cell.slice(start, idx) + val;
+                pos = semiIdx + 1;
+                start = pos;
+                continue;
+              }
+            }
+          }
+          // Not a valid reference, or not in lookup. Treat as literal '%'
+          res += cell.slice(start, idx + 1);
+          pos = idx + 1;
+          start = pos;
+        }
+      }
 
       newRow[j] = res;
     }
