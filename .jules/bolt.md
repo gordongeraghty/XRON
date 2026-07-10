@@ -17,3 +17,8 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+
+## 2026-07-10 - Optimize expandSubstringRefs regex overhead
+**Learning:** Using `String.prototype.replace` with regex/closures and sentinels for delimited substring substitution creates significant garbage collection overhead and requires multiple string scans. It's an anti-pattern in V8 for hot paths.
+**Action:** Use imperative string scanning with `.indexOf('%')` and manual `.slice()` / string concatenation to process escapes and template values in a single pass, which is over 2x faster.

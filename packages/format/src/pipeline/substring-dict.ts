@@ -189,37 +189,82 @@ export function expandSubstringRefs(
 
   // Build lookup: index → value
   const lookup = new Map<number, string>();
-  for (const entry of substringDict) {
+  for (let i = 0; i < substringDict.length; i++) {
+    const entry = substringDict[i];
     lookup.set(entry.index, entry.value);
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
-    const newRow = new Array<string>(row.length);
+    const newRow = row.slice();
+
     for (let j = 0; j < row.length; j++) {
       const cell = row[j];
-      if (!cell || cell.indexOf('%') === -1) {
-        newRow[j] = cell;
+      if (!cell || typeof cell !== 'string') {
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      let percentIdx = cell.indexOf('%');
+      if (percentIdx === -1) {
+        continue;
+      }
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
+      let expanded = '';
+      let lastCopiedIndex = 0;
 
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+      while (percentIdx !== -1) {
+        if (percentIdx > lastCopiedIndex) {
+          expanded += cell.slice(lastCopiedIndex, percentIdx);
+        }
 
-      newRow[j] = res;
+        if (percentIdx + 1 < cell.length) {
+          const nextChar = cell.charCodeAt(percentIdx + 1);
+
+          if (nextChar === 37) { // '%'
+            expanded += '%';
+            lastCopiedIndex = percentIdx + 2;
+            percentIdx = cell.indexOf('%', lastCopiedIndex);
+            continue;
+          }
+
+          if (nextChar >= 48 && nextChar <= 57) { // '0' to '9'
+            let semiIdx = cell.indexOf(';', percentIdx + 2);
+            if (semiIdx !== -1 && semiIdx - percentIdx <= 10) { // arbitrary small bound for int length
+              let isDigits = true;
+              for (let k = percentIdx + 2; k < semiIdx; k++) {
+                const code = cell.charCodeAt(k);
+                if (code < 48 || code > 57) {
+                  isDigits = false;
+                  break;
+                }
+              }
+              if (isDigits) {
+                const indexStr = cell.slice(percentIdx + 1, semiIdx);
+                const index = parseInt(indexStr, 10);
+                const replacement = lookup.get(index);
+                if (replacement !== undefined) {
+                  expanded += replacement;
+                  lastCopiedIndex = semiIdx + 1;
+                  percentIdx = cell.indexOf('%', lastCopiedIndex);
+                  continue;
+                }
+              }
+            }
+          }
+        }
+
+        expanded += '%';
+        lastCopiedIndex = percentIdx + 1;
+        percentIdx = cell.indexOf('%', lastCopiedIndex);
+      }
+
+      if (lastCopiedIndex < cell.length) {
+        expanded += cell.slice(lastCopiedIndex);
+      }
+
+      newRow[j] = expanded;
     }
     result[i] = newRow;
   }
