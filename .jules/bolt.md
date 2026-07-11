@@ -17,3 +17,8 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+
+## 2026-07-11 - Optimize Longest Common Prefix and Suffix
+**Learning:** In V8, spreading strings into character arrays and reversing them (`[...s].reverse())` causes severe memory allocation overhead and is >20x slower than using native `endsWith()` and `startsWith()` combined with `slice()`. However, when slicing to remove characters, one must account for UTF-16 surrogate pairs (high/low surrogate ranges) to avoid splitting emojis.
+**Action:** Prefer imperative slicing with `charCodeAt()` surrogate checks for suffix/prefix matching over array spread operations.
