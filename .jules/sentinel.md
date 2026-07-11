@@ -12,3 +12,9 @@
 **Vulnerability:** Missing filter for the `prototype` key in `decodeSchemaRows` and `decodeSchemaInstance`.
 **Learning:** Prototype pollution bypasses can occur when objects are instantiated and populated by bypassing `__proto__` and `constructor` but not `prototype` during deep property assignment.
 **Prevention:** Always filter out `prototype` along with `__proto__` and `constructor` during object deserialization and assignment.
+
+
+## 2026-07-11 - Prototype Pollution in Positional Decoding
+**Vulnerability:** Found prototype pollution vulnerability in `packages/format/src/pipeline/positional.ts` during positional and nested object parsing.
+**Learning:** When parsing schemas and positional data dynamically using bracket notation, special keys like `__proto__`, `constructor`, and `prototype` must be filtered to avoid overwriting Object prototype methods.
+**Prevention:** Always explicitly check for and block special keys when dynamically assigning properties to objects during deserialization.

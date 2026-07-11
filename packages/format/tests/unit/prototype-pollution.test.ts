@@ -14,4 +14,25 @@ describe('Prototype Pollution Prevention', () => {
     const result = XRON.parse(payload) as any;
     expect(({} as any).polluted).toBeUndefined();
   });
+  it('should ignore __proto__ in positional rows (layer 2)', () => {
+    const payload = `XRON:0.1
+users:
+  @S A: __proto__, value
+  @N2 A
+  {"polluted": "yes"}, 123`;
+    const result = XRON.parse(payload) as any;
+    expect(({} as any).polluted).toBeUndefined();
+  });
+
+  it('should ignore __proto__ in nested positional rows (layer 2)', () => {
+    const payload = `XRON:0.1
+users:
+  @S B: __proto__, value
+  @S A: nested, value
+  @N2 A
+  B({"polluted": "yes"}, 123), 456`;
+    const result = XRON.parse(payload) as any;
+    expect(({} as any).polluted).toBeUndefined();
+  });
+
 });
