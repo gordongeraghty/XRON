@@ -194,32 +194,63 @@ export function expandSubstringRefs(
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
-    const newRow = new Array<string>(row.length);
+    const newRow = row.slice(); // Fast row copy
+
     for (let j = 0; j < row.length; j++) {
       const cell = row[j];
-      if (!cell || cell.indexOf('%') === -1) {
-        newRow[j] = cell;
-        continue;
+      if (cell && cell.indexOf('%') !== -1) {
+        let res = '';
+        let start = 0;
+
+        for (let k = 0; k < cell.length; k++) {
+          if (cell.charCodeAt(k) === 37) { // '%'
+            // %% escaped percent
+            if (k + 1 < cell.length && cell.charCodeAt(k + 1) === 37) {
+              res += cell.slice(start, k) + '%';
+              k++; // skip second %
+              start = k + 1;
+            } else {
+              // %N; substring reference
+              let end = k + 1;
+              let index = 0;
+              let valid = false;
+
+              while (end < cell.length) {
+                const code = cell.charCodeAt(end);
+                if (code >= 48 && code <= 57) { // '0'-'9'
+                  index = index * 10 + (code - 48);
+                  end++;
+                } else if (code === 59 && end > k + 1) { // ';' and at least one digit
+                  valid = true;
+                  break;
+                } else {
+                  break; // Invalid character in reference
+                }
+              }
+
+              if (valid) {
+                res += cell.slice(start, k);
+                const val = lookup.get(index);
+                if (val !== undefined) {
+                  res += val;
+                } else {
+                  res += cell.slice(k, end + 1); // keep original if not found
+                }
+                k = end;
+                start = k + 1;
+              }
+            }
+          }
+        }
+
+        if (start < cell.length) {
+          res += cell.slice(start);
+        }
+        newRow[j] = res;
       }
-
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
-
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
-
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
-
-      newRow[j] = res;
     }
     result[i] = newRow;
   }
