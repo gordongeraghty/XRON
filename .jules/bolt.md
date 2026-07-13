@@ -17,3 +17,12 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+
+## 2024-05-24 - [Optimize string parsing in XRON]
+**Learning:** String parsing using character-by-character concatenation (e.g., `current += ch`) creates massive intermediate string allocations and puts severe pressure on V8's garbage collector, especially in hot loops like `splitRow`, `splitTopLevel`, and `parseDictValues`.
+**Action:** Replace string concatenation with imperative substring scanning. Use native string functions like `slice(start, i)` combined with tracking the `start` index. Additionally, using `charCodeAt(i)` for character comparisons is slightly faster than string indexing (`str[i]`).
+
+## 2024-05-24 - [Optimize string parsing in XRON]
+**Learning:** String parsing using character-by-character concatenation (e.g., `current += ch`) creates massive intermediate string allocations and puts severe pressure on V8's garbage collector, especially in hot loops like `splitRow`, `splitTopLevel`, and `parseDictValues`. Using `slice()` and `charCodeAt` significantly speeds this up without risking regressions.
+**Action:** Replace string concatenation with imperative substring scanning where possible. Use native string functions like `slice(start, i)` combined with tracking the `start` index. Additionally, using `charCodeAt(i)` for character comparisons is slightly faster than string indexing (`str[i]`).

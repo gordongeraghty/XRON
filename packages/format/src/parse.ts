@@ -764,39 +764,36 @@ function parseInlineBracketObject(
  */
 function splitTopLevel(input: string): string[] {
   const parts: string[] = [];
-  let current = '';
+  let start = 0;
   let depth = 0;
   let inQuotes = false;
 
   let isEscaped = false;
 
   for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
+    const ch = input.charCodeAt(i);
     
-    if (ch === '\\' && !isEscaped) {
+    if (ch === 92 && !isEscaped) { // '\\'
       isEscaped = true;
-      current += ch;
       continue;
     }
 
-    if (ch === '"' && !isEscaped) {
+    if (ch === 34 && !isEscaped) { // '"'
       inQuotes = !inQuotes;
-      current += ch;
-    } else if (!inQuotes && (ch === '{' || ch === '[' || ch === '(')) {
+    } else if (!inQuotes && (ch === 123 || ch === 91 || ch === 40)) { // '{', '[', '('
       depth++;
-      current += ch;
-    } else if (!inQuotes && (ch === '}' || ch === ']' || ch === ')')) {
+    } else if (!inQuotes && (ch === 125 || ch === 93 || ch === 41)) { // '}', ']', ')'
       depth--;
-      current += ch;
-    } else if (ch === ',' && !inQuotes && depth === 0) {
-      parts.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+    } else if (ch === 44 && !inQuotes && depth === 0) { // ','
+      parts.push(input.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
-  if (current.trim()) parts.push(current.trim());
+  if (start < input.length) {
+    const last = input.slice(start).trim();
+    if (last) parts.push(last);
+  }
   return parts;
 }
 
@@ -808,14 +805,14 @@ function splitKeyValue(str: string): [string, string] {
   let isEscaped = false;
 
   for (let i = 0; i < str.length; i++) {
-    const ch = str[i];
-    if (ch === '\\' && !isEscaped) {
+    const ch = str.charCodeAt(i);
+    if (ch === 92 && !isEscaped) { // '\\'
       isEscaped = true;
       continue;
     }
-    if (ch === '"' && !isEscaped) {
+    if (ch === 34 && !isEscaped) { // '"'
       inQuotes = !inQuotes;
-    } else if (ch === ':' && !inQuotes) {
+    } else if (ch === 58 && !inQuotes) { // ':'
       return [str.slice(0, i), str.slice(i + 1)];
     }
     isEscaped = false;

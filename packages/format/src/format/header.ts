@@ -154,29 +154,29 @@ export function parseDictValues(input: string): string[] {
   let isEscaped = false;
 
   for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
+    const ch = input.charCodeAt(i);
 
     if (isEscaped) {
       // Previous char was backslash — consume the escaped char literally
-      current += ch;
+      current += String.fromCharCode(ch);
       isEscaped = false;
       continue;
     }
 
-    if (ch === '\\' && inQuotes) {
+    if (ch === 92 && inQuotes) { // '\\'
       // Start escape sequence inside quotes
       isEscaped = true;
       continue;
     }
 
-    if (ch === '"') {
+    if (ch === 34) { // '"'
       inQuotes = !inQuotes;
       // Don't include the quote character in the value
-    } else if (ch === ',' && !inQuotes) {
+    } else if (ch === 44 && !inQuotes) { // ','
       values.push(current.trim());
       current = '';
     } else {
-      current += ch;
+      current += String.fromCharCode(ch);
     }
   }
   if (current.trim().length > 0) {
