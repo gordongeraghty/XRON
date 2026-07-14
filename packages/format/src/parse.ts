@@ -764,39 +764,44 @@ function parseInlineBracketObject(
  */
 function splitTopLevel(input: string): string[] {
   const parts: string[] = [];
-  let current = '';
   let depth = 0;
   let inQuotes = false;
-
   let isEscaped = false;
+  let startIdx = 0;
 
   for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
+    const code = input.charCodeAt(i);
     
-    if (ch === '\\' && !isEscaped) {
+    // '\\'
+    if (code === 92 && !isEscaped) {
       isEscaped = true;
-      current += ch;
       continue;
     }
 
-    if (ch === '"' && !isEscaped) {
+    // '"'
+    if (code === 34 && !isEscaped) {
       inQuotes = !inQuotes;
-      current += ch;
-    } else if (!inQuotes && (ch === '{' || ch === '[' || ch === '(')) {
-      depth++;
-      current += ch;
-    } else if (!inQuotes && (ch === '}' || ch === ']' || ch === ')')) {
-      depth--;
-      current += ch;
-    } else if (ch === ',' && !inQuotes && depth === 0) {
-      parts.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+    } else if (!inQuotes) {
+      // '{' or '[' or '('
+      if (code === 123 || code === 91 || code === 40) {
+        depth++;
+      }
+      // '}' or ']' or ')'
+      else if (code === 125 || code === 93 || code === 41) {
+        depth--;
+      }
+      // ','
+      else if (code === 44 && depth === 0) {
+        const val = input.slice(startIdx, i).trim();
+        parts.push(val);
+        startIdx = i + 1;
+      }
     }
     isEscaped = false;
   }
-  if (current.trim()) parts.push(current.trim());
+
+  const lastVal = input.slice(startIdx).trim();
+  if (lastVal) parts.push(lastVal);
   return parts;
 }
 
@@ -808,14 +813,18 @@ function splitKeyValue(str: string): [string, string] {
   let isEscaped = false;
 
   for (let i = 0; i < str.length; i++) {
-    const ch = str[i];
-    if (ch === '\\' && !isEscaped) {
+    const code = str.charCodeAt(i);
+    // '\\'
+    if (code === 92 && !isEscaped) {
       isEscaped = true;
       continue;
     }
-    if (ch === '"' && !isEscaped) {
+    // '"'
+    if (code === 34 && !isEscaped) {
       inQuotes = !inQuotes;
-    } else if (ch === ':' && !inQuotes) {
+    }
+    // ':'
+    else if (code === 58 && !inQuotes) {
       return [str.slice(0, i), str.slice(i + 1)];
     }
     isEscaped = false;

@@ -194,32 +194,70 @@ export function expandSubstringRefs(
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
     const newRow = new Array<string>(row.length);
     for (let j = 0; j < row.length; j++) {
       const cell = row[j];
-      if (!cell || cell.indexOf('%') === -1) {
+
+      let k = cell ? cell.indexOf('%') : -1;
+      if (k === -1) {
         newRow[j] = cell;
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      let out = '';
+      let lastMatch = 0;
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
+      while (k !== -1) {
+        out += cell.slice(lastMatch, k);
 
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+        if (k + 1 < cell.length && cell.charCodeAt(k + 1) === 37) { // '%%'
+            out += '%';
+            k += 2;
+            lastMatch = k;
+        } else {
+            // parse index
+            let nextSemi = cell.indexOf(';', k + 1);
+            if (nextSemi !== -1) {
+                let isNum = true;
+                let num = 0;
+                for (let m = k + 1; m < nextSemi; m++) {
+                    const code = cell.charCodeAt(m);
+                    if (code >= 48 && code <= 57) { // '0'-'9'
+                        num = num * 10 + (code - 48);
+                    } else {
+                        isNum = false;
+                        break;
+                    }
+                }
+                if (isNum && nextSemi > k + 1) {
+                    const mapped = lookup.get(num);
+                    if (mapped !== undefined) {
+                        out += mapped;
+                    } else {
+                        out += cell.slice(k, nextSemi + 1);
+                    }
+                    k = nextSemi + 1;
+                    lastMatch = k;
+                } else {
+                    out += '%';
+                    k += 1;
+                    lastMatch = k;
+                }
+            } else {
+                out += '%';
+                k += 1;
+                lastMatch = k;
+            }
+        }
 
-      newRow[j] = res;
+        k = cell.indexOf('%', lastMatch);
+      }
+
+      out += cell.slice(lastMatch);
+      newRow[j] = out;
     }
     result[i] = newRow;
   }
