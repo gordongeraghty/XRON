@@ -17,3 +17,8 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+
+## 2026-07-15 - String optimization without array spreading
+**Learning:** When finding common suffixes in strings, avoiding the severe memory overhead of spreading strings into character arrays (`[...str].reverse()` combined with `Array.map`) is critical. Native `.endsWith()` and `.slice()` execute vastly faster but require careful surrogate pair handling to avoid splitting emojis or other multi-byte characters when slicing.
+**Action:** Replaced array spreading pattern with native `.endsWith()` and `.slice()` combined with `.charCodeAt()` checks for surrogate boundaries (0xDC00 - 0xDFFF and 0xD800 - 0xDBFF) in `packages/format/src/pipeline/column-template.ts`.
