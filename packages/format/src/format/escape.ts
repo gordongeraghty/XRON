@@ -33,39 +33,65 @@ export function escapeValue(value: string): string {
     return value;
   }
   // Quote the string, escaping internal quotes and backslashes
-  const escaped = value
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t');
-  return `"${escaped}"`;
+  let res = '"';
+  let last = 0;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value.charCodeAt(i);
+    // \, ", \n, \r, \t
+    if (ch === 92 || ch === 34 || ch === 10 || ch === 13 || ch === 9) {
+      res += value.slice(last, i);
+      switch(ch) {
+        case 92: res += '\\\\'; break;
+        case 34: res += '\\"'; break;
+        case 10: res += '\\n'; break;
+        case 13: res += '\\r'; break;
+        case 9:  res += '\\t'; break;
+      }
+      last = i + 1;
+    }
+  }
+  if (last === 0) {
+    return '"' + value + '"';
+  }
+  return res + value.slice(last) + '"';
 }
 
 /**
  * Unescape a quoted string from XRON input.
  */
 export function unescapeValue(value: string): string {
-  if (!value.startsWith('"') || !value.endsWith('"')) {
+  if (value.charCodeAt(0) !== 34 || value.charCodeAt(value.length - 1) !== 34) {
     return value;
   }
-  const inner = value.slice(1, -1);
+
   let result = '';
-  for (let i = 0; i < inner.length; i++) {
-    if (inner[i] === '\\' && i + 1 < inner.length) {
-      const next = inner[i + 1];
+  let last = 1;
+  const end = value.length - 1;
+
+  let i = 1;
+  while (i < end) {
+    if (value.charCodeAt(i) === 92 && i + 1 < end) {
+      result += value.slice(last, i);
+      const next = value.charCodeAt(i + 1);
       switch (next) {
-        case '\\': result += '\\'; i++; break;
-        case '"': result += '"'; i++; break;
-        case 'n': result += '\n'; i++; break;
-        case 'r': result += '\r'; i++; break;
-        case 't': result += '\t'; i++; break;
-        default: result += '\\' + next; i++; break;
+        case 92: result += '\\'; break; // \
+        case 34: result += '"'; break; // "
+        case 110: result += '\n'; break; // n
+        case 114: result += '\r'; break; // r
+        case 116: result += '\t'; break; // t
+        default: result += '\\' + String.fromCharCode(next); break;
       }
+      i += 2;
+      last = i;
     } else {
-      result += inner[i];
+      i++;
     }
   }
+
+  if (last < end) {
+    result += value.slice(last, end);
+  }
+
   return result;
 }
 

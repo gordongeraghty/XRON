@@ -142,7 +142,7 @@ export function applySubstringRefs(
       const cell = row[j];
 
       // Skip special values
-      if (!cell || cell === '-' || cell === '~' || cell.startsWith('$') || cell.startsWith('+')) {
+      if (!cell || cell === '-' || cell === '~' || cell.charCodeAt(0) === 36 || cell.charCodeAt(0) === 43) { // $, +
         newRow[j] = cell;
         continue;
       }
@@ -150,7 +150,20 @@ export function applySubstringRefs(
       // Escape existing literal % → %% before any substitution
       let escaped = cell;
       if (cell.indexOf('%') !== -1) {
-        escaped = cell.replace(/%/g, '%%');
+        let res = '';
+        let last = 0;
+        let k = 0;
+        while (k < cell.length) {
+          const idx = cell.indexOf('%', k);
+          if (idx === -1) {
+            res += cell.slice(last);
+            break;
+          }
+          res += cell.slice(last, idx) + '%%';
+          k = idx + 1;
+          last = k;
+        }
+        escaped = res;
       }
 
       // Try each substring entry (longest first)
@@ -194,8 +207,6 @@ export function expandSubstringRefs(
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
@@ -207,18 +218,52 @@ export function expandSubstringRefs(
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      let res = '';
+      let k = 0;
+      while (k < cell.length) {
+        const pctIdx = cell.indexOf('%', k);
+        if (pctIdx === -1) {
+          res += cell.slice(k);
+          break;
+        }
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
+        res += cell.slice(k, pctIdx);
+        k = pctIdx + 1;
 
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+        if (k < cell.length && cell.charCodeAt(k) === 37) { // '%'
+          res += '%';
+          k++;
+        } else {
+          let num = 0;
+          let m = k;
+          let isValid = false;
+          while (m < cell.length) {
+            const ch = cell.charCodeAt(m);
+            if (ch >= 48 && ch <= 57) {
+              num = num * 10 + (ch - 48);
+              m++;
+            } else if (ch === 59) { // ';'
+              if (m > k) {
+                isValid = true;
+              }
+              break;
+            } else {
+              break;
+            }
+          }
 
+          if (isValid) {
+            const val = lookup.get(num);
+            if (val !== undefined) {
+              res += val;
+              k = m + 1;
+              continue;
+            }
+          }
+
+          res += '%';
+        }
+      }
       newRow[j] = res;
     }
     result[i] = newRow;
