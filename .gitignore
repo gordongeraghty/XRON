@@ -13,3 +13,4 @@ Thumbs.db
 packages/*/dist/
 packages/*/node_modules/
 site/node_modules/
+venv/

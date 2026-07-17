@@ -264,8 +264,18 @@ export default function Playground() {
 
       {/* Format panels */}
       {activeFormats.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 dark:text-gray-600 text-sm">
-          Select at least one format above to compare.
+        <div className="flex flex-col items-center justify-center py-16 px-4 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 mb-8">
+          <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+          </svg>
+          <p className="text-sm font-medium mb-1">No formats selected</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4 text-center max-w-sm">Select one or more formats above to compare token usage and payload sizes.</p>
+          <button
+            onClick={() => setActiveFormats(DEFAULT_ACTIVE)}
+            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-violet-300 dark:hover:border-violet-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 shadow-sm"
+          >
+            Reset to defaults
+          </button>
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 mb-8">
