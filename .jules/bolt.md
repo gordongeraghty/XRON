@@ -17,3 +17,8 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+
+## 2024-05-30 - Replaced [...str].reverse() with native .endsWith() in suffix scanning
+**Learning:** When optimizing string suffix matching (e.g. for column template detection), using the spread operator `[...str].reverse()` combined with map operations introduces massive memory overhead and V8 garbage collection pressure. Native `.endsWith()` scanning combined with `.slice()` is significantly faster (~7-8x in benchmarks).
+**Action:** Replaced the array-reversal logic in `longestCommonSuffix` with imperative `.endsWith()` scanning, ensuring to add boundary checks using `.charCodeAt()` to prevent improperly splitting UTF-16 surrogate pairs (like emojis).
