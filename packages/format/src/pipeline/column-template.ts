@@ -139,7 +139,24 @@ function longestCommonPrefix(strs: string[]): string {
 /** Find the longest common suffix of an array of strings */
 function longestCommonSuffix(strs: string[]): string {
   if (strs.length === 0) return '';
-  const reversed = strs.map(s => [...s].reverse().join(''));
-  const revPrefix = longestCommonPrefix(reversed);
-  return [...revPrefix].reverse().join('');
+  let suffix = strs[0];
+  for (let i = 1; i < strs.length; i++) {
+    while (!strs[i].endsWith(suffix)) {
+      suffix = suffix.slice(1);
+      if (suffix === '') return '';
+    }
+  }
+
+  // Safe string slicing for unicode/surrogate pairs when trimming from the front
+  // If we sliced off the high surrogate of a pair, the remaining string will
+  // start with a low surrogate (0xDC00 - 0xDFFF).
+  if (suffix.length > 0) {
+    const firstChar = suffix.charCodeAt(0);
+    if (firstChar >= 0xDC00 && firstChar <= 0xDFFF) {
+       // We split a surrogate pair, so back off one character
+       suffix = suffix.slice(1);
+    }
+  }
+
+  return suffix;
 }
