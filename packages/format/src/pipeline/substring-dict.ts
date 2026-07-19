@@ -194,8 +194,7 @@ export function expandSubstringRefs(
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
+
 
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
@@ -207,18 +206,51 @@ export function expandSubstringRefs(
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      // Optimization (Bolt): We optimize text substitution by avoiding Regex, replace,
+      // and character-by-character concatenation which creates excessive intermediate strings.
+      let res = '';
+      let start = 0;
+      for (let k = 0; k < cell.length; k++) {
+        if (cell.charCodeAt(k) === 37) { // '%'
+          res += cell.slice(start, k);
+          if (k + 1 < cell.length && cell.charCodeAt(k + 1) === 37) { // '%%'
+            res += '%';
+            k++;
+            start = k + 1;
+            continue;
+          }
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
+          let end = k + 1;
+          let isValid = false;
+          while (end < cell.length) {
+            const code = cell.charCodeAt(end);
+            if (code === 59) { // ';'
+              isValid = true;
+              break;
+            }
+            if (code < 48 || code > 57) { // not a digit
+              break;
+            }
+            end++;
+          }
 
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+          if (isValid && end > k + 1) {
+            let numStr = cell.slice(k + 1, end);
+            let num = parseInt(numStr, 10);
+            const val = lookup.get(num);
+            if (val !== undefined) {
+              res += val;
+              k = end;
+              start = k + 1;
+              continue;
+            }
+          }
 
+          res += '%';
+          start = k + 1;
+        }
+      }
+      res += cell.slice(start);
       newRow[j] = res;
     }
     result[i] = newRow;
