@@ -91,6 +91,7 @@ export function decodePositionalRows(
           const nestedObj: Record<string, any> = {};
           for (let j = 0; j < nestedSchema.fields.length; j++) {
             const nField = nestedSchema.fields[j];
+            if (nField === '__proto__' || nField === 'constructor' || nField === 'prototype') continue;
             const nRaw = j < nestedValues.length ? nestedValues[j].trim() : '';
             nestedObj[nField] = decodeValue(nRaw, allSchemas, dictionary);
           }
@@ -99,6 +100,7 @@ export function decodePositionalRows(
         }
       }
 
+      if (field === '__proto__' || field === 'constructor' || field === 'prototype') continue;
       obj[field] = decodeValue(raw, allSchemas, dictionary);
     }
 
