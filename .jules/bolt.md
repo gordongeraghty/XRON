@@ -17,3 +17,7 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+## 2024-06-03 - Removed String.prototype.replace with Regex in hot paths
+**Learning:** In hot substitution paths such as dictionary expansion (`expandSubstringRefs`) and string escaping (`escapeValue`), `String.prototype.replace` combined with Regex introduces huge garbage collection pressure and a massive performance overhead in V8 compared to imperative character code checks and string concatenations. Benchmarking showed imperative implementations are 2-5x faster.
+**Action:** When implementing text substitution in XRON's encoding loop, favor manual index scanning (`indexOf`, `charCodeAt`, `slice`) over RegEx matching if performance is critical and operations are frequent.

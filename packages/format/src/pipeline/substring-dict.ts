@@ -194,9 +194,6 @@ export function expandSubstringRefs(
   }
 
   const result = new Array<string[]>(cells.length);
-  const sentinel = '\x00PCNT\x00';
-  const sentinelRegex = new RegExp(sentinel, 'g');
-
   for (let i = 0; i < cells.length; i++) {
     const row = cells[i];
     const newRow = new Array<string>(row.length);
@@ -207,17 +204,47 @@ export function expandSubstringRefs(
         continue;
       }
 
-      // Step 1: Temporarily replace escaped %% with a sentinel
-      let res = cell.replace(/%%/g, sentinel);
+      let res = '';
+      let lastIdx = 0;
+      let idx = cell.indexOf('%');
+      while (idx !== -1) {
+        if (idx > lastIdx) res += cell.slice(lastIdx, idx);
 
-      // Step 2: Expand %N; references (semicolon-terminated)
-      res = res.replace(/%(\d+);/g, (match, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return lookup.get(index) ?? match; // Keep original if not found
-      });
-
-      // Step 3: Restore sentinel → literal %
-      res = res.replace(sentinelRegex, '%');
+        if (idx + 1 < cell.length && cell.charCodeAt(idx + 1) === 37) { // %%
+          res += '%';
+          lastIdx = idx + 2;
+        } else {
+          let k = idx + 1;
+          let parsedNum = 0;
+          let isValid = false;
+          while (k < cell.length) {
+            const ch = cell.charCodeAt(k);
+            if (ch >= 48 && ch <= 57) {
+              parsedNum = parsedNum * 10 + (ch - 48);
+              k++;
+            } else if (ch === 59 && k > idx + 1) { // ';'
+              isValid = true;
+              break;
+            } else {
+              break;
+            }
+          }
+          if (isValid) {
+            const replacement = lookup.get(parsedNum);
+            if (replacement !== undefined) {
+              res += replacement;
+            } else {
+              res += cell.slice(idx, k + 1);
+            }
+            lastIdx = k + 1;
+          } else {
+            res += '%';
+            lastIdx = idx + 1;
+          }
+        }
+        idx = cell.indexOf('%', lastIdx);
+      }
+      if (lastIdx < cell.length) res += cell.slice(lastIdx);
 
       newRow[j] = res;
     }

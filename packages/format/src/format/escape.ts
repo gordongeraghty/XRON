@@ -32,14 +32,30 @@ export function escapeValue(value: string): string {
   if (!needsQuoting(value)) {
     return value;
   }
-  // Quote the string, escaping internal quotes and backslashes
-  const escaped = value
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t');
-  return `"${escaped}"`;
+
+  let res = '"';
+  let lastIdx = 0;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value.charCodeAt(i);
+    if (ch === 92) { // \
+      res += value.slice(lastIdx, i) + '\\\\';
+      lastIdx = i + 1;
+    } else if (ch === 34) { // "
+      res += value.slice(lastIdx, i) + '\\"';
+      lastIdx = i + 1;
+    } else if (ch === 10) { // \n
+      res += value.slice(lastIdx, i) + '\\n';
+      lastIdx = i + 1;
+    } else if (ch === 13) { // \r
+      res += value.slice(lastIdx, i) + '\\r';
+      lastIdx = i + 1;
+    } else if (ch === 9) { // \t
+      res += value.slice(lastIdx, i) + '\\t';
+      lastIdx = i + 1;
+    }
+  }
+  res += value.slice(lastIdx) + '"';
+  return res;
 }
 
 /**
