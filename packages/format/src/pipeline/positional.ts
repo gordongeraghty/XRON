@@ -117,20 +117,20 @@ function detectTabSeparator(row: string): boolean {
   let isEscaped = false;
 
   for (let i = 0; i < row.length; i++) {
-    const ch = row[i];
+    const ch = row.charCodeAt(i);
 
-    if (ch === '\\' && !isEscaped) {
+    if (ch === 92 && !isEscaped) {
       isEscaped = true;
       continue;
     }
 
-    if (ch === '"' && !isEscaped) {
+    if (ch === 34 && !isEscaped) {
       inQuotes = !inQuotes;
-    } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
+    } else if (!inQuotes && (ch === 40 || ch === 91 || ch === 123)) {
       depth++;
-    } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
+    } else if (!inQuotes && (ch === 41 || ch === 93 || ch === 125)) {
       depth--;
-    } else if (ch === '\t' && !inQuotes && depth === 0) {
+    } else if (ch === 9 && !inQuotes && depth === 0) {
       return true;
     }
     isEscaped = false;
@@ -145,41 +145,38 @@ function detectTabSeparator(row: string): boolean {
 export function splitRow(row: string): string[] {
   const useTab = detectTabSeparator(row);
   const values: string[] = [];
-  let current = '';
   let inQuotes = false;
   let depth = 0; // nesting depth for (), [], {}
 
   let isEscaped = false;
+  let start = 0;
 
   for (let i = 0; i < row.length; i++) {
-    const ch = row[i];
+    const ch = row.charCodeAt(i);
 
-    if (ch === '\\' && !isEscaped) {
+    if (ch === 92 && !isEscaped) { // '\\'
       isEscaped = true;
-      current += ch;
       continue;
     }
 
-    if (ch === '"' && !isEscaped) {
+    if (ch === 34 && !isEscaped) { // '"'
       inQuotes = !inQuotes;
-      current += ch;
-    } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
+    } else if (!inQuotes && (ch === 40 || ch === 91 || ch === 123)) { // '(', '[', '{'
       depth++;
-      current += ch;
-    } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
+    } else if (!inQuotes && (ch === 41 || ch === 93 || ch === 125)) { // ')', ']', '}'
       depth--;
-      current += ch;
-    } else if (useTab ? (ch === '\t' && !inQuotes && depth === 0) : (ch === ',' && !inQuotes && depth === 0)) {
-      values.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
+    } else if ((useTab ? ch === 9 : ch === 44) && !inQuotes && depth === 0) { // '\t' or ','
+      values.push(row.slice(start, i).trim());
+      start = i + 1;
     }
     isEscaped = false;
   }
 
-  if (current.trim().length > 0) {
-    values.push(current.trim());
+  if (start < row.length) {
+    const remain = row.slice(start).trim();
+    if (remain.length > 0) {
+      values.push(remain);
+    }
   }
 
   return values;
