@@ -17,3 +17,7 @@
 ## 2024-05-30 - O(N) array allocation overhead in data sampling
 **Learning:** In the `detectDeltaPotential` function in `adaptive.ts`, using `Array.filter().slice()` to sample the first 20 records forces V8 to iterate over and allocate memory for the entire dataset (which could be hundreds of thousands of rows).
 **Action:** Replace full array functional chains like `.filter().slice()` with imperative `for` loops that `break` early to achieve O(1) sampling performance and avoid intermediate garbage collection overhead.
+
+## 2024-05-31 - Replaced RegExp with imperative scanning in date and uuid processing
+**Learning:** In hot serialization paths, `String.prototype.replace()` with regular expressions (e.g. `replace(/-/g, '')`) introduces measurable overhead from V8 RegEx parsing and garbage collection for temporary strings, even for simple replacement operations like stripping hyphens.
+**Action:** Replaced regex-based substitutions in `escape.ts` `escapeValue`, `unescapeValue`, `type-encoding.ts` `compactDate`, `uuidToBase62`, and `delta.ts` `toISOString()` usages with fast imperative iteration over strings (`charCodeAt` and `slice` operations).

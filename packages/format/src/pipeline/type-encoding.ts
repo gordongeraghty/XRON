@@ -114,15 +114,17 @@ export function decodeTypedValue(raw: string, level: XronLevel): any {
  * "2026-04-01T14:30:00Z" → "20260401T143000Z"
  */
 export function compactDate(iso: string): string {
-  // Date only: 2026-04-01 → 20260401
-  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-    return iso.replace(/-/g, '');
+  // Performance optimization: Imperative loop is faster than RegEx to strip '-' and ':'
+    let out = '';
+  let last = 0;
+  for (let i = 0; i < iso.length; i++) {
+    const ch = iso.charCodeAt(i);
+    if (ch === 45 || ch === 58) { // '-' or ':'
+      out += iso.slice(last, i);
+      last = i + 1;
+    }
   }
-
-  // DateTime: remove dashes and colons but keep T and Z/offset
-  return iso
-    .replace(/-/g, '')
-    .replace(/:/g, '');
+  return out + iso.slice(last);
 }
 
 /**
@@ -187,7 +189,16 @@ const BASE62_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
  * "550e8400-e29b-41d4-a716-446655440000" → shorter base62 string (~22 chars)
  */
 export function uuidToBase62(uuid: string): string {
-  const hex = uuid.replace(/-/g, '');
+  // Performance optimization: Imperative loop is faster than .replace(/-/g, '')
+  let hex = '';
+  let last = 0;
+  for (let i = 0; i < uuid.length; i++) {
+    if (uuid.charCodeAt(i) === 45) {
+      hex += uuid.slice(last, i);
+      last = i + 1;
+    }
+  }
+  hex += uuid.slice(last);
   let num = BigInt('0x' + hex);
   if (num === 0n) return '0';
 

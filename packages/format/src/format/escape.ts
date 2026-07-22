@@ -32,14 +32,32 @@ export function escapeValue(value: string): string {
   if (!needsQuoting(value)) {
     return value;
   }
-  // Quote the string, escaping internal quotes and backslashes
-  const escaped = value
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t');
-  return `"${escaped}"`;
+
+  // Performance optimization: Imperative loop with charCodeAt and slice
+  // is significantly faster than chained .replace() with RegEx.
+  let escaped = '';
+  let lastIndex = 0;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value.charCodeAt(i);
+    if (ch === 92) {
+      escaped += value.slice(lastIndex, i) + '\\\\';
+      lastIndex = i + 1;
+    } else if (ch === 34) {
+      escaped += value.slice(lastIndex, i) + '\\"';
+      lastIndex = i + 1;
+    } else if (ch === 10) {
+      escaped += value.slice(lastIndex, i) + '\\n';
+      lastIndex = i + 1;
+    } else if (ch === 13) {
+      escaped += value.slice(lastIndex, i) + '\\r';
+      lastIndex = i + 1;
+    } else if (ch === 9) {
+      escaped += value.slice(lastIndex, i) + '\\t';
+      lastIndex = i + 1;
+    }
+  }
+  if (lastIndex === 0) return `"${value}"`;
+  return `"${escaped + value.slice(lastIndex)}"`;
 }
 
 /**
@@ -50,23 +68,34 @@ export function unescapeValue(value: string): string {
     return value;
   }
   const inner = value.slice(1, -1);
+
+  // Fast path for strings without backslash
+  // Performance optimization: Imperative parsing is faster than RegEx here.
+  // Fast path for strings without backslash
+  const firstSlash = inner.indexOf('\\');
+  if (firstSlash === -1) return inner;
+
   let result = '';
-  for (let i = 0; i < inner.length; i++) {
-    if (inner[i] === '\\' && i + 1 < inner.length) {
-      const next = inner[i + 1];
+  let lastIndex = 0;
+  const len = inner.length;
+
+  for (let i = firstSlash; i < len; i++) {
+    if (inner.charCodeAt(i) === 92 && i + 1 < len) {
+      result += inner.slice(lastIndex, i);
+      const next = inner.charCodeAt(i + 1);
       switch (next) {
-        case '\\': result += '\\'; i++; break;
-        case '"': result += '"'; i++; break;
-        case 'n': result += '\n'; i++; break;
-        case 'r': result += '\r'; i++; break;
-        case 't': result += '\t'; i++; break;
-        default: result += '\\' + next; i++; break;
+        case 92: result += '\\'; break;
+        case 34: result += '"'; break;
+        case 110: result += '\n'; break;
+        case 114: result += '\r'; break;
+        case 116: result += '\t'; break;
+        default: result += '\\' + String.fromCharCode(next); break;
       }
-    } else {
-      result += inner[i];
+      i++;
+      lastIndex = i + 1;
     }
   }
-  return result;
+  return result + inner.slice(lastIndex);
 }
 
 /**

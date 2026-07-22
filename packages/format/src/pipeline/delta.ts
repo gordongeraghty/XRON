@@ -391,13 +391,34 @@ export function decodeDeltaRows(
           if (isDateOnly) {
             if (isCompact) {
               // Compact date-only: 20260401
-              result[row][col] = d.toISOString().slice(0, 10).replace(/-/g, '');
+              // Performance optimization: Imperative loop is faster than .replace(/-/g, '')
+              let iso2 = d.toISOString().slice(0, 10);
+              let out2 = '';
+              let last2 = 0;
+              for (let i = 0; i < iso2.length; i++) {
+                if (iso2.charCodeAt(i) === 45) {
+                  out2 += iso2.slice(last2, i);
+                  last2 = i + 1;
+                }
+              }
+              result[row][col] = out2 + iso2.slice(last2);
             } else {
               result[row][col] = d.toISOString().slice(0, 10);
             }
           } else if (isCompact) {
             // Compact datetime: 20260401T103000Z
-            result[row][col] = d.toISOString().replace(/-/g, '').replace(/:/g, '').replace(/\.\d{3}/, '');
+            // Performance optimization: Imperative loop is faster than chained .replace()
+            let iso = d.toISOString();
+            let out = '';
+            let last = 0;
+            for (let i = 0; i < iso.length; i++) {
+              const ch = iso.charCodeAt(i);
+              if (ch === 45 || ch === 58) {
+                out += iso.slice(last, i);
+                last = i + 1;
+              }
+            }
+            result[row][col] = (out + iso.slice(last)).replace(/\.\d{3}/, '');
           } else {
             result[row][col] = d.toISOString();
           }
