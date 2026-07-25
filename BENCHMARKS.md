@@ -3,7 +3,8 @@
 XRON is designed to solve the "token tax" of structured data in LLM context windows. This document provides empirical evidence from our benchmark suite comparing JSON (minified) against XRON Levels 1, 2, and 3.
 
 For the correctness side — how the lossless guarantee is tested, what was found,
-and the one known limitation — see [docs/VERIFICATION.md](docs/VERIFICATION.md).
+and what a zero failure rate does and does not establish — see
+[docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 ---
 
@@ -162,7 +163,7 @@ losslessness claim:
 npx vitest run packages/format/tests/lossless-property.test.ts
 ```
 
-Or run everything (569 tests):
+Or run everything (591 tests):
 
 ```bash
 npm test

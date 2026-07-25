@@ -19,12 +19,13 @@ examples that happen to pass.
 | | Round-trip failures | Rate |
 |---|---|---|
 | 0.3.0 (published) | 2,673 / 4,800 | **55.7%** |
-| 0.4.0 | 1 / 42,000 | **0.002%** |
+| 0.4.0 | **0 / 114,000** | **0%** |
 
 Measured across randomised payloads at all four levels (1, 2, 3 and `auto`),
-over seven independent seeds.
+over nineteen independent seeds.
 
-The single remaining failure is documented in §6. It is not hidden.
+Zero is a measurement over this generator, not a proof of universal
+correctness — see §6 for what that does and does not establish.
 
 ---
 
@@ -87,7 +88,7 @@ cd packages/format && npm pack
 
 ## 3. What was found
 
-Fourteen silent data-corruption bugs. Every one returned wrong data **without
+Sixteen silent data-corruption bugs. Every one returned wrong data **without
 throwing** — no exception, no warning, just different data.
 
 ### Temporal
@@ -110,6 +111,8 @@ throwing** — no exception, no warning, just different data.
 | An object key containing `:` split at that colon | 1–3 |
 | Column templates stripping delimiters the row splitter needs | 2 |
 | The substring dictionary lifting unbalanced brackets out of cells | 3 |
+| An empty column-template residual at a row edge, eaten by the decoder's row trim | 3 |
+| The checksum verified against a trimmed document, reporting spurious mismatches | all |
 
 The quote bug was the single largest source of corruption — fixing that one line
 took the fuzz failure rate from 51.1% to 29.3% and eliminated an entire crash
@@ -127,7 +130,7 @@ class (`Cannot read properties of undefined`).
 
 ### The two root causes
 
-These are not fourteen unrelated defects. They reduce to two:
+These are not sixteen unrelated defects. They reduce to two:
 
 1. **The decoder re-derived decisions the encoder had already made** — inferring
    delta columns from a leading `+`/`-`, and date-ness from an 8-digit
@@ -154,7 +157,8 @@ re-measure. The fuzz rate after each stage:
 | After substring-dictionary balance fix | 19.4% |
 | After the `@X` delta-column header | 6.4% |
 | After BigInt `n` marker and type-hint narrowing | 3.7% |
-| After whitespace and integer guards | **0.002%** |
+| After whitespace and integer guards | 0.002% |
+| After the empty-residual and checksum-trim fixes (§6) | **0%** |
 
 ---
 
@@ -181,21 +185,57 @@ integers decode as dates), and two asserting `BigInt(42)` encodes as `'42'`
 
 Every changed test carries its justification inline in the file. No test was
 skipped, no assertion loosened, no tolerance widened, no `.only` or `.skip`
-introduced. Suite: **314 → 569 tests**.
+introduced. Suite: **314 → 591 tests**.
 
 ---
 
-## 6. Known limitation
+## 6. The last two bugs, and what "zero" means
 
-One failure in 42,000 randomised round-trips is open and not yet root-caused.
+The final fuzz failure — 1 in 42,000, held open through several rounds — was
+root-caused to **two independent bugs**, both now fixed and both covered by
+regression tests.
 
-- **Signature:** a cell merges with the one following it, accompanied by a
-  checksum-mismatch warning — which points at the encoder emitting an
-  inconsistent document rather than at a decode bug.
-- **Reproducibility:** one fuzz seed only; no minimal reproduction yet, so it is
-  not covered by a test.
+### Bug A — an empty column-template residual at a row edge
 
-It is recorded here rather than rounded away.
+```js
+[{ f0: 'has space 1', f1: null },
+ { f0: 'has space 19', f1: 1 }]   // Level 3 only
+```
+
+The template prefix `has space 1` consumes row 0's value entirely, leaving an
+empty residual. In the **first or last** column that puts the field separator at
+the very edge of the line (`"\t-"`), and the decoder collects rows with
+`line.trim()` — which eats it. The row then splits into one cell instead of two,
+and every column after it reads the wrong value. An interior empty cell is
+flanked by separators, so it was never affected.
+
+Fixed in `detectColumnTemplates`: an empty residual in column 0 or the last
+column now disqualifies the template, and that column is written literally.
+
+### Bug B — checksum verified against a trimmed document
+
+`parse()` computed `input.trim()` and passed the *trimmed* string to
+`parseDocument`, but the encoder had computed the checksum over the **untrimmed**
+payload. Any document legitimately ending in a meaningful field separator — an
+empty trailing cell — therefore hashed differently and reported a spurious
+`Checksum mismatch`. Fixed by passing the untrimmed `input`; `parseDocument`
+already skips blank lines itself.
+
+> **A note on how this was found.** The checksum warning and the corruption
+> looked like one bug and were investigated as one for some time. They were not:
+> the warning came from a *different* fuzz iteration than the corruption. Chasing
+> the assumed connection cost real effort. The lesson is recorded here because
+> the same trap is easy to fall into again — two symptoms appearing in the same
+> log are not evidence of one cause.
+
+### What zero does and does not establish
+
+114,000 round-trips with no failure is strong evidence, not a proof. It says the
+property holds across everything this generator produces: mixed scalars, nested
+objects and arrays, BigInts, nulls, dates in several formats, and strings that
+collide with XRON's own syntax. It cannot speak for shapes the generator never
+emits. If you hit a round-trip failure, it is a bug worth reporting — the corpus
+in §2.1 is where a regression case would be added.
 
 ---
 
@@ -254,7 +294,7 @@ requires wiring in the real tokenizer rather than a better guess.
 npm install
 npm run build
 
-# Full suite (569 tests)
+# Full suite (591 tests)
 npm test
 
 # The round-trip property alone

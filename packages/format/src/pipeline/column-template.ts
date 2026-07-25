@@ -70,6 +70,12 @@ export function detectColumnTemplates(
         // whitespace loses it and the value re-expands wrong: prefix
         // "has space" over "has space 17" leaves " 17", trimmed to "17".
         if (residual !== residual.trim()) return true;
+        // An empty residual in the first or last column puts the field
+        // separator at the very edge of the line, and the decoder collects
+        // rows with line.trim() — which eats it. The row then splits into one
+        // cell instead of two and every column after it reads the wrong value.
+        // An interior empty cell is flanked by separators, so it is safe.
+        if (residual === '' && (col === 0 || col === numCols - 1)) return true;
         return hasUnsafeDelimiterAtDepthZero(residual);
       });
       if (!unsafe) {

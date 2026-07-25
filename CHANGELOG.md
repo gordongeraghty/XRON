@@ -21,9 +21,9 @@ payloads across all four levels:
 | | Failures |
 |---|---|
 | 0.3.0 | 2,673 / 4,800 (55.7%) |
-| 0.4.0 | 1 / 42,000 across 7 seeds (0.002%) |
+| 0.4.0 | 0 / 114,000 across 19 seeds (0%) |
 
-The single remaining failure is described under *Known issues*.
+No failures remain. See [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 ### Fixed — temporal
 
@@ -129,14 +129,17 @@ Measured against 0.3.0 on 500-row payloads (see [BENCHMARKS.md](BENCHMARKS.md)):
 - `LICENSE` in the `xron-format` package directory. It was listed in `files` but
   did not exist, so published tarballs shipped without licence text.
 
-### Known issues
+### Also fixed
 
-- **One failure in 42,000 randomised round-trips remains, not yet root-caused.**
-  Signature: a cell merges with the following cell (`"has space 1"` absorbing an
-  adjacent inline object), accompanied by a checksum mismatch warning — which
-  suggests an encoder-side inconsistency rather than a decode bug. Reproduces
-  only under fuzz seed 8675309; no minimal reproduction yet, so it is not
-  covered by a test.
+- **An empty column-template residual at a row edge corrupted the row.** A
+  template prefix that consumed a value entirely left an empty residual; in the
+  first or last column that put the field separator at the line edge, where the
+  decoder's row-collection `.trim()` ate it and the row split into too few
+  cells. *Level 3.*
+- **The checksum was verified against a trimmed document.** `parse()` passed a
+  trimmed string to the verifier while the encoder had hashed the untrimmed
+  payload, so any document ending in a meaningful field separator reported a
+  spurious mismatch. Decode-only; no wire change.
 
 ## xron-cli 0.3.0
 

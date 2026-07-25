@@ -109,8 +109,13 @@ export function parse(input: string, options?: XronOptions): unknown {
     return parseKeyValueBlock(trimmed, 1, [], new Map());
   }
 
-  // Parse the XRON document
-  const doc = parseDocument(trimmed, opts.strictValidation);
+  // Parse the XRON document.
+  // Deliberately `input`, not `trimmed`: the checksum was computed by the
+  // encoder over the untrimmed payload, so trimming here made verification
+  // hash a different string and report a spurious mismatch whenever the
+  // document legitimately ended in a meaningful field separator (an empty
+  // trailing cell). parseDocument skips blank lines itself.
+  const doc = parseDocument(input, opts.strictValidation);
   return doc.data;
 }
 

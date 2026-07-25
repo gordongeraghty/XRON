@@ -227,6 +227,28 @@ const corpus: Record<string, unknown> = {
     [false, true, false],
   ],
 
+  // ── Column templates that would empty a cell at a row edge ────────────
+  // A template whose prefix consumes the whole value leaves an empty residual.
+  // In the first or last column that puts the field separator at the very edge
+  // of the line, and the decoder collects rows with line.trim(), which eats it.
+  'template/empty residual in the first column': [
+    { f0: 'has space 1', f1: null },
+    { f0: 'has space 19', f1: 1 },
+  ],
+  'template/empty residual in the last column': [
+    { f0: -474, f1: 'has:colon19' },
+    { f0: '+9s', f1: 'has:colon9' },
+  ],
+  'template/prefix consumes an entire value': [
+    { a: 'prefix', b: 1 },
+    { a: 'prefix2', b: 2 },
+    { a: 'prefix34', b: 3 },
+  ],
+  'template/empty residual with a single column pair': rows(8, i => ({
+    code: i === 0 ? 'ITEM' : `ITEM${i}`,
+    n: i,
+  })),
+
   // ── Combined: dates and a large dictionary in one payload ─────────────
   'combined/dates plus 120-entry dictionary': (() => {
     const words = rows(120, i => `longtoken_${String(i).padStart(3, '0')}`)
