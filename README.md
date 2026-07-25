@@ -14,6 +14,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/xron-format"><img src="https://img.shields.io/npm/v/xron-format.svg?style=flat-square" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/xron-format"><img src="https://img.shields.io/npm/dt/xron-format.svg?style=flat-square&label=downloads" alt="npm downloads" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT Licence" /></a>
   <a href="https://github.com/gordongeraghty/XRON/actions"><img src="https://img.shields.io/github/actions/workflow/status/gordongeraghty/XRON/ci.yml?label=tests&style=flat-square" alt="Tests" /></a>
   <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
@@ -27,7 +28,8 @@
   <a href="#compression-levels">Levels</a> &middot;
   <a href="#api-reference">API</a> &middot;
   <a href="#benchmarks--format-comparison">Benchmarks</a> &middot;
-  <a href="#contributing">Contributing</a>
+  <a href="#contributing">Contributing</a> &middot;
+  <a href="https://npm-stat.com/charts.html?package=xron-format">Download history</a>
 </p>
 
 ---
