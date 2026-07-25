@@ -7,12 +7,11 @@ export default defineConfig({
   base: './',
   resolve: {
     alias: {
-      '@xron': resolve(__dirname, '../src'),
       'tiktoken': resolve(__dirname, 'src/stubs/tiktoken.ts')
     }
   },
   build: {
-    outDir: '../docs',
+    outDir: 'dist',
     rollupOptions: {
       output: {
         manualChunks: {

@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\Users\Gordon Geraghty\OneDrive\Documents\GitHub\Toon v2\xron"
+cd /d "H:\My Drive\GitHub\Toon v2\xron"
 echo.
 echo ============================================
 echo  XRON Monorepo Migration - TestSprite

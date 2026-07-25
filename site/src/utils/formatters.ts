@@ -1,4 +1,4 @@
-import { XRON } from '@xron/index'
+import { XRON } from 'xron-format'
 import yaml from 'js-yaml'
 
 export type FormatId =
@@ -34,6 +34,43 @@ export const FORMAT_LABELS: Record<FormatId, string> = {
   'xron-3': 'XRON L3',
   'xron-auto': 'XRON Auto',
   yaml: 'YAML',
+}
+
+/** Formats that claim a lossless round-trip and must therefore be verified. */
+const LOSSLESS_FORMATS = new Set<FormatId>(['xron-1', 'xron-2', 'xron-3', 'xron-auto'])
+
+/** JSON.stringify that survives BigInt, so the comparison itself cannot throw. */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val) =>
+    typeof val === 'bigint' ? `${val.toString()}n` : val
+  )
+}
+
+/**
+ * Decode a format's own output and check it reproduces the input exactly.
+ *
+ * This page is how most people evaluate XRON, and until now it only ever
+ * called stringify — the decode path was completely unexercised, which is how
+ * six silent-corruption bugs shipped in 0.3.0. Any future regression in the
+ * decoder now shows up on the first visit instead of in someone's data.
+ *
+ * Returns null when the round-trip is exact, or a reason when it is not.
+ * TOON, TRON and YAML are rendered for token comparison only and make no
+ * losslessness claim, so they are not checked.
+ */
+export function verifyRoundTrip(
+  data: unknown,
+  formatId: FormatId,
+  encoded: string
+): string | null {
+  if (!LOSSLESS_FORMATS.has(formatId)) return null
+  try {
+    const decoded = XRON.parse(encoded)
+    if (stableStringify(decoded) === stableStringify(data)) return null
+    return 'Round-trip mismatch — decoding this output does not reproduce the input.'
+  } catch (e: unknown) {
+    return `Round-trip failed — ${e instanceof Error ? e.message : 'the decoder threw'}`
+  }
 }
 
 export function formatData(data: unknown, formatId: FormatId): string {
