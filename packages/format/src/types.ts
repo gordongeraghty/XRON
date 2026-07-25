@@ -131,49 +131,6 @@ export interface DeltaColumnInfo {
   isBigInt?: boolean;
 }
 
-/** Token types for the XRON lexer */
-export enum TokenType {
-  // Headers
-  VersionHeader = 'VERSION_HEADER',
-  SchemaHeader = 'SCHEMA_HEADER',
-  DictHeader = 'DICT_HEADER',
-  CardinalityHeader = 'CARDINALITY_HEADER',
-
-  // Values
-  String = 'STRING',
-  QuotedString = 'QUOTED_STRING',
-  Number = 'NUMBER',
-  Boolean = 'BOOLEAN',
-  Null = 'NULL',
-  DictRef = 'DICT_REF',
-  Delta = 'DELTA',
-  Repeat = 'REPEAT',
-  SameAsPrev = 'SAME_AS_PREV',
-
-  // Structure
-  Comma = 'COMMA',
-  Colon = 'COLON',
-  Newline = 'NEWLINE',
-  Indent = 'INDENT',
-  OpenParen = 'OPEN_PAREN',
-  CloseParen = 'CLOSE_PAREN',
-  OpenBracket = 'OPEN_BRACKET',
-  CloseBracket = 'CLOSE_BRACKET',
-
-  // Special
-  SchemaRef = 'SCHEMA_REF',
-  EOF = 'EOF',
-  Comment = 'COMMENT',
-}
-
-/** Lexer token */
-export interface Token {
-  type: TokenType;
-  value: string;
-  line: number;
-  column: number;
-}
-
 /** Internal representation of parsed XRON structure */
 export interface XronDocument {
   version: XronLevel;
