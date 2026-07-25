@@ -21,6 +21,31 @@ export interface SubstringEntry {
  * @param maxEntries - Maximum dictionary entries (default: 32)
  * @returns Array of substring entries sorted by savings potential
  */
+/**
+ * Does this substring open and close every delimiter it contains?
+ * Only balanced substrings are safe to lift out of a cell, because removing
+ * them must leave the cell's remaining delimiters as splitRow expects them.
+ */
+function isDelimiterBalanced(s: string): boolean {
+  let depth = 0;
+  let quotes = 0;
+  let isEscaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '\\' && !isEscaped) { isEscaped = true; continue; }
+    if (ch === '"' && !isEscaped) {
+      quotes++;
+    } else if (ch === '(' || ch === '[' || ch === '{') {
+      depth++;
+    } else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
+      if (depth < 0) return false;
+    }
+    isEscaped = false;
+  }
+  return depth === 0 && quotes % 2 === 0;
+}
+
 export function buildSubstringDictionary(
   cells: string[][],
   minLength: number = 6,
@@ -66,6 +91,20 @@ export function buildSubstringDictionary(
   const candidates: Array<{ value: string; frequency: number; savings: number }> = [];
   for (const [sub, freq] of substringFreq) {
     if (freq < minFrequency) continue;
+
+    // A substring is replaced by "%N;" in the cell, so lifting one that
+    // contains an unmatched bracket or quote hides that delimiter from
+    // splitRow — which runs BEFORE substring refs are expanded and relies on
+    // them to find field boundaries. Lifting "B(city" out of "B(city0, c0)"
+    // left a stray ")" that drove the depth negative and swallowed the
+    // separator for the rest of the row.
+    if (!isDelimiterBalanced(sub)) continue;
+
+    // The @P header is a comma-separated list whose entries are trimmed on the
+    // way back in, so a substring with leading or trailing whitespace cannot
+    // survive its own header: "has space " came back as "has space", and every
+    // cell referencing it lost the gap ("has space 18" -> "has space18").
+    if (sub !== sub.trim()) continue;
 
     // Calculate savings: each occurrence saves (sub.length - refLength) chars
     // refLength is "%N;" = 3 chars for single digit, 4 for double digit (semicolon delimiter)

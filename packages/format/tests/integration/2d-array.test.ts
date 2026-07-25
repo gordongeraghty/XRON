@@ -56,15 +56,16 @@ describe('2D Array Encoding', () => {
       expect(result).toEqual(bools);
     });
 
-    it.each([2, 3] as const)('boolean 2D array at level %i coerces booleans to 0/1 in @A encoding', (level) => {
+    // Changed deliberately. This previously asserted that @A encoding returned
+    // [[1,0,1],[0,1,0]] for a boolean input — i.e. it pinned data corruption as
+    // expected behaviour. An anonymous @A array carries no schema field-type
+    // hints, so nothing can turn 1/0 back into a boolean; booleans there are
+    // now written as true/false and the values survive. Losslessness is the
+    // format's stated guarantee, so it outranks the old expectation.
+    it.each([2, 3] as const)('round-trips a boolean 2D array at level %i', (level) => {
       const xron = XRON.stringify(bools, { level });
       const result = XRON.parse(xron);
-      // @A columnar encoding coerces booleans to numeric 0/1
-      const expected = [
-        [1, 0, 1],
-        [0, 1, 0],
-      ];
-      expect(result).toEqual(expected);
+      expect(result).toEqual(bools);
     });
   });
 

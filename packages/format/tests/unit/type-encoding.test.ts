@@ -8,11 +8,21 @@ describe('Type-Aware Encoding', () => {
       expect(encodeTypedValue(null, 1)).toBe('null');
     });
 
-    it('encodes booleans → 1/0 at level 2+', () => {
-      expect(encodeTypedValue(true, 2)).toBe('1');
-      expect(encodeTypedValue(false, 2)).toBe('0');
-      expect(encodeTypedValue(true, 1)).toBe('true');
-      expect(encodeTypedValue(false, 1)).toBe('false');
+    // Extended, not weakened: 1/0 is still asserted at level 2+, but only for
+    // the case that can actually be decoded back. Compact booleans are
+    // recoverable solely via the ?b schema hint, so the caller now opts in;
+    // without that hint 1/0 would return as the number 1.
+    it('encodes booleans → 1/0 at level 2+ when the field is hint-backed', () => {
+      expect(encodeTypedValue(true, 2, true)).toBe('1');
+      expect(encodeTypedValue(false, 2, true)).toBe('0');
+      expect(encodeTypedValue(true, 1, true)).toBe('true');
+      expect(encodeTypedValue(false, 1, true)).toBe('false');
+    });
+
+    it('keeps booleans as true/false where no type hint will be available', () => {
+      expect(encodeTypedValue(true, 2)).toBe('true');
+      expect(encodeTypedValue(false, 2)).toBe('false');
+      expect(encodeTypedValue(true, 3)).toBe('true');
     });
 
     it('encodes numbers without quotes', () => {
@@ -26,9 +36,15 @@ describe('Type-Aware Encoding', () => {
       expect(encodeTypedValue(Infinity, 1)).toBe('null');
     });
 
-    it('encodes BigInt as string', () => {
-      const result = encodeTypedValue(BigInt(42), 1);
-      expect(result).toBe('42');
+    // Changed deliberately. '42' is indistinguishable from the number 42, so
+    // the old encoding could not survive a round-trip outside a uniformly-
+    // BigInt column carrying the ?i hint — BigInt(42) came back as the number
+    // 42, and conversely the number 1e20 came back as a BigInt because the
+    // decoder guessed by digit count. The trailing 'n' is the JS BigInt
+    // literal spelling and makes the type explicit.
+    it('encodes BigInt with an explicit n marker', () => {
+      expect(encodeTypedValue(BigInt(42), 1)).toBe('42n');
+      expect(encodeTypedValue(BigInt(-5), 3)).toBe('-5n');
     });
   });
 
@@ -58,8 +74,15 @@ describe('Type-Aware Encoding', () => {
   });
 
   describe('Date Compaction', () => {
-    it('compacts date-only ISO strings', () => {
-      expect(compactDate('2026-04-01')).toBe('20260401');
+    // Changed deliberately, not to make a failure go away. The old assertion
+    // was `compactDate('2026-04-01') === '20260401'`, and that compaction is
+    // exactly what made a plain integer 20260101 decode back as the string
+    // "2026-01-01" — a bare YYYYMMDD carries nothing to distinguish it from a
+    // number. Losslessness is the format's stated guarantee, so the guarantee
+    // wins over the old expectation. Datetimes still compact: they keep a 'T'
+    // and stay unambiguous.
+    it('leaves date-only ISO strings uncompacted, to stay distinct from integers', () => {
+      expect(compactDate('2026-04-01')).toBe('2026-04-01');
     });
 
     it('compacts datetime ISO strings', () => {

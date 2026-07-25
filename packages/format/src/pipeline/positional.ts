@@ -24,7 +24,11 @@ export function encodePositionalRows(
   items: any[],
   schema: SchemaDefinition,
   allSchemas: Map<string, SchemaDefinition>,
-  encodeValue: (value: any, schemas: Map<string, SchemaDefinition>) => string,
+  encodeValue: (
+    value: any,
+    schemas: Map<string, SchemaDefinition>,
+    fieldIndex?: number,
+  ) => string,
   level: XronLevel = 2,
   fieldSep: string = ', ',
 ): string[] {
@@ -50,7 +54,10 @@ export function encodePositionalRows(
           values.push(encodeValue(value, allSchemas));
         }
       } else {
-        values.push(encodeValue(value, allSchemas));
+        // Pass the field index so the encoder can consult this schema's type
+        // hints. Nested-schema values above deliberately omit it — they belong
+        // to a different schema, so this one's hints do not describe them.
+        values.push(encodeValue(value, allSchemas, i));
       }
     }
     rows.push(values.join(fieldSep));

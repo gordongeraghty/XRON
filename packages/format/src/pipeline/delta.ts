@@ -20,8 +20,66 @@ import { expandDate } from './type-encoding.js';
 // ISO date string pattern (date-only or full datetime)
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 
-// Compact date pattern (20260401 or 20260401T103000Z etc.)
-const COMPACT_DATE_RE = /^\d{8}(T\d{4,6}(Z|[+-]\d{4})?)?$/;
+// Compact date pattern (20260401, 20260401T103000Z, 20260401T103000.000Z etc.)
+// The fractional-seconds group is required: Date.prototype.toISOString() always
+// emits milliseconds, so without it the most common timestamp format in
+// JavaScript fails the gate below and parses to NaN.
+const COMPACT_DATE_RE = /^\d{8}(T\d{4,6}(\.\d+)?(Z|[+-]\d{4})?)?$/;
+
+// A value is only safe to delta-encode if its exact text can be rebuilt from
+// (epoch seconds + one shape shared by the whole column).
+const ISO_SHAPE_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(\.\d+)?Z)?$/;
+
+// Anchor shapes the decoder can reproduce exactly. Date-only values are no
+// longer compacted (a bare YYYYMMDD is ambiguous with an integer), so the
+// anchor for a date-only column arrives in full ISO form.
+const ANCHOR_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ANCHOR_DATETIME_RE = /^\d{8}T\d{6}(\.\d+)?Z$/;
+
+/**
+ * Classify an ISO value into a shape key, or null when temporal delta cannot
+ * reproduce it exactly.
+ *
+ * Deliberately refused, because epoch seconds do not carry them:
+ * - UTC offsets ("-05:00") — reconstruction always emits Z, changing the text
+ * - a missing timezone — parsed as local time, re-emitted as UTC
+ * - a missing seconds field — reconstruction always emits seconds
+ * - non-zero fractional seconds — sub-second precision is not in the delta
+ *
+ * Refused columns fall back to plain compact-date encoding, which round-trips.
+ */
+function temporalShape(value: string): string | null {
+  const m = ISO_SHAPE_RE.exec(value);
+  if (!m) return null;
+  if (!value.includes('T')) return 'date';
+  const frac = m[1];
+  if (frac && /[^0.]/.test(frac)) return null;
+  return `datetime:${frac ? frac.length - 1 : 0}`;
+}
+
+/**
+ * Rebuild a date string from epoch seconds, in the column's shape.
+ * Returns null for an epoch that does not yield a valid Date, so callers can
+ * degrade instead of letting toISOString() throw.
+ */
+function formatCompactFromEpoch(
+  epochSec: number,
+  dateOnly: boolean,
+  fracDigits: number,
+): string | null {
+  const d = new Date(epochSec * 1000);
+  if (isNaN(d.getTime())) return null;
+  const iso = d.toISOString();
+  // Date-only stays in full ISO form, matching what the encoder now emits.
+  if (dateOnly) return iso.slice(0, 10);
+  const stamp = iso.slice(0, 19).replace(/-/g, '').replace(/:/g, '');
+  return fracDigits > 0 ? `${stamp}.${'0'.repeat(fracDigits)}Z` : `${stamp}Z`;
+}
+
+/** Read a cell as a BigInt, tolerating the trailing 'n' type marker. */
+function toBigInt(raw: string): bigint {
+  return BigInt(raw.endsWith('n') ? raw.slice(0, -1) : raw);
+}
 
 /**
  * Parse a date string (ISO or compact) to epoch seconds.
@@ -90,6 +148,13 @@ function analyzeTemporalColumn(
   // All values must be ISO date strings
   if (!values.every(v => typeof v === 'string' && ISO_DATE_RE.test(v))) return null;
 
+  // ...and must all share one reproducible shape. A column mixing date-only
+  // with datetime, or carrying UTC offsets or real sub-second precision,
+  // cannot survive the epoch round-trip, so it is left un-delta'd.
+  const shape = temporalShape(values[0] as string);
+  if (shape === null) return null;
+  if (!values.every(v => temporalShape(v as string) === shape)) return null;
+
   // Convert to epoch seconds
   const epochs: number[] = values.map(v => Math.floor(new Date(v as string).getTime() / 1000));
 
@@ -135,8 +200,11 @@ function analyzeNumericColumn(
   const hasBigInt = values.some(v => typeof v === 'bigint');
 
   if (hasBigInt) {
-    // Mixed safety: promote all numeric values to BigInt
-    if (!values.every(v => typeof v === 'bigint' || (typeof v === 'number' && isFinite(v)))) return null;
+    // Mixed safety: promote all numeric values to BigInt. Only whole numbers
+    // can be promoted — BigInt(967.585) throws, and rounding would lose data.
+    if (!values.every(v =>
+      typeof v === 'bigint' || (typeof v === 'number' && Number.isInteger(v))
+    )) return null;
 
     const bigValues: bigint[] = values.map(v => BigInt(v as number | bigint));
     const deltas: bigint[] = [];
@@ -221,8 +289,8 @@ export function applyDeltaEncoding(
       }
     } else if (deltaInfo.isBigInt) {
       for (let row = 1; row < result.length; row++) {
-        const currentVal = BigInt(rows[row][col]);
-        const prevVal = BigInt(rows[row - 1][col]);
+        const currentVal = toBigInt(rows[row][col]);
+        const prevVal = toBigInt(rows[row - 1][col]);
         const delta = currentVal - prevVal;
         result[row][col] = delta >= 0n ? `+${delta}` : `${delta}`;
       }
@@ -294,47 +362,45 @@ export function decodeDeltaRows(
       // subsequent rows are +Ns or -Ns (seconds delta).
       // Reconstruct by converting first row to epoch, then accumulating.
       const firstVal = result[0][col];
+      const dateOnly = ANCHOR_DATE_ONLY_RE.test(firstVal);
+      const datetime = ANCHOR_DATETIME_RE.exec(firstVal);
       let currentEpoch = parseDateToEpoch(firstVal);
 
-      // Detect format: is the first value date-only (no T) or datetime?
-      const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(firstVal) || /^\d{8}$/.test(firstVal);
-      // Detect if compact format (no dashes)
-      const isCompact = COMPACT_DATE_RE.test(firstVal);
+      // An anchor we cannot read (an unresolved $ref, a corrupt cell) means the
+      // whole column is undecodable. Leave the raw deltas in place and move on:
+      // building a Date from NaN and calling toISOString() throws RangeError,
+      // which would take the entire document down over one bad column.
+      if ((!dateOnly && datetime === null) || !Number.isFinite(currentEpoch)) continue;
+
+      // Carry the anchor's fractional width through, rather than stripping it
+      // with a fixed .replace(/\.\d{3}/, '') that only ever matched 3 digits.
+      const fracDigits = datetime?.[1] ? datetime[1].length - 1 : 0;
 
       for (let row = 1; row < result.length; row++) {
         const raw = result[row][col];
         // Temporal delta ends with 's' (seconds)
-        if (raw.endsWith('s') && (raw.startsWith('+') || raw.startsWith('-'))) {
-          const deltaSec = parseInt(raw.slice(0, -1), 10);
-          currentEpoch = currentEpoch + deltaSec;
-          // Reconstruct date string from epoch in same format as first row
-          const d = new Date(currentEpoch * 1000);
-          if (isDateOnly) {
-            if (isCompact) {
-              // Compact date-only: 20260401
-              result[row][col] = d.toISOString().slice(0, 10).replace(/-/g, '');
-            } else {
-              result[row][col] = d.toISOString().slice(0, 10);
-            }
-          } else if (isCompact) {
-            // Compact datetime: 20260401T103000Z
-            result[row][col] = d.toISOString().replace(/-/g, '').replace(/:/g, '').replace(/\.\d{3}/, '');
-          } else {
-            result[row][col] = d.toISOString();
-          }
-        }
-        // else: non-delta value (shouldn't happen but pass through)
+        if (!raw.endsWith('s') || !(raw.startsWith('+') || raw.startsWith('-'))) continue;
+
+        const deltaSec = parseInt(raw.slice(0, -1), 10);
+        if (!Number.isFinite(deltaSec)) continue;
+
+        currentEpoch = currentEpoch + deltaSec;
+        const rebuilt = formatCompactFromEpoch(currentEpoch, dateOnly, fracDigits);
+        if (rebuilt === null) continue;
+        result[row][col] = rebuilt;
       }
     } else if (isBigInt) {
-      let currentValue = BigInt(result[0][col]);
+      let currentValue = toBigInt(result[0][col]);
 
       for (let row = 1; row < result.length; row++) {
         const raw = result[row][col];
         if (raw.startsWith('+') || (raw.startsWith('-') && raw.length > 1)) {
-          currentValue = currentValue + BigInt(raw);
-          result[row][col] = String(currentValue);
+          currentValue = currentValue + toBigInt(raw);
+          // Re-emit with the 'n' marker so the value still identifies itself
+          // as a BigInt once it reaches the type decoder.
+          result[row][col] = `${currentValue}n`;
         } else {
-          currentValue = BigInt(raw);
+          currentValue = toBigInt(raw);
         }
       }
     } else {

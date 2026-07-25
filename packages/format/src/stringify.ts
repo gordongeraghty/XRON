@@ -32,9 +32,10 @@ import {
   formatAnonymousArrayHeader,
   formatTemplateHeader,
   formatSubstringDictHeader,
+  formatDeltaColumnsHeader,
 } from './format/header.js';
 import { crc32Hex } from './utils/crc32.js';
-import { escapeValue } from './format/escape.js';
+import { escapeValue, escapeKey } from './format/escape.js';
 import { getSeparatorConfig, getFieldSep } from './pipeline/tokenizer-opt.js';
 import {
   ColumnTemplate,
@@ -125,9 +126,11 @@ export function stringify(value: any, options?: XronOptions): string {
   if (value === null || value === undefined) return 'null';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (typeof value === 'number') return String(value);
-  if (typeof value === 'string') return escapeValue(value);
+  // A lone top-level string is emitted with no @v header, so the parser has
+  // only the presence of a colon to tell a string from a key/value block.
+  if (typeof value === 'string') return escapeKey(value);
   if (value instanceof Date) return escapeValue(compactDate(value.toISOString()));
-  if (typeof value === 'bigint') return String(value);
+  if (typeof value === 'bigint') return `${value}n`;
 
   // Detect circular references early
   const seen = new WeakSet();
@@ -341,11 +344,18 @@ function encodeSchemaArray(
 
   // Encode values positionally — use encodePrimitive for simple values,
   // encodeInlineValue for arrays/objects that aren't nested schemas
-  const valueEncoder = (val: any, allSchemas: Map<string, SchemaDefinition>): string => {
+  const valueEncoder = (
+    val: any,
+    allSchemas: Map<string, SchemaDefinition>,
+    fieldIndex?: number,
+  ): string => {
     if (val !== null && typeof val === 'object') {
       return encodeInlineValue(val, level, dictLookup, seen);
     }
-    return encodePrimitive(val, level, dictLookup);
+    // Compact 1/0 booleans only where the ?b hint will be there to decode them.
+    const isBooleanField =
+      fieldIndex !== undefined && schema.fieldTypes.get(fieldIndex) === 'boolean';
+    return encodePrimitive(val, level, dictLookup, isBooleanField);
   };
 
   const rows = encodePositionalRows(arr, schema, schemas, valueEncoder, level, fieldSep);
@@ -359,8 +369,31 @@ function encodeSchemaArray(
     if (level >= 3 && rows.length >= opts.deltaThreshold) {
       const rawRows = arr.map(item => schema.fields.map(f => item[f]));
       deltaColumnsInfo = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold);
+
+      // Dictionary substitution (Layer 3) already ran, so a repeated date may
+      // now be a "$0" ref. Temporal delta reads the cell text to get its
+      // anchor, and "$0" is not a date — V8 even parses it as February 2001,
+      // which is why this corrupted silently instead of throwing. Re-encode
+      // temporal columns as literal dates before the delta layer sees them.
+      for (const info of deltaColumnsInfo) {
+        if (info.type !== 'temporal') continue;
+        for (let row = 0; row < parsed2D.length; row++) {
+          parsed2D[row][info.columnIndex] = encodeTypedValue(
+            rawRows[row][info.columnIndex],
+            level,
+          );
+        }
+      }
+
       parsed2D = applyDeltaEncoding(parsed2D, deltaColumnsInfo);
       parsed2D = applyRepeatEncoding(parsed2D, deltaColumnsInfo);
+    }
+
+    // Record the delta decision so the decoder never has to guess it from a
+    // leading '+' or '-'. Emitted for every level-3 block, including when no
+    // column qualified, so an empty list is meaningful rather than absent.
+    if (level >= 3) {
+      lines.push(formatDeltaColumnsHeader(deltaColumnsInfo.map(d => d.columnIndex)));
     }
 
     // 2. Column Templates (Level 2+)
@@ -417,7 +450,9 @@ function encodeObject(
   if (schema) {
     // Schema-referenced standalone object: SchemaName(val1, val2, ...)
     const schemaName = level >= 2 ? schema.name : schema.fullName;
-    const values = schema.fields.map(f => encodePrimitive(obj[f], level, dictLookup));
+    const values = schema.fields.map((f, i) =>
+      encodePrimitive(obj[f], level, dictLookup, schema.fieldTypes.get(i) === 'boolean'),
+    );
     return [`${indent}${schemaName}(${values.join(', ')})`];
   }
 
@@ -435,6 +470,7 @@ function encodePrimitive(
   value: any,
   level: XronLevel,
   dictLookup: Map<string, string>,
+  compactBoolean = false,
 ): string {
   // Dictionary lookup (Level 2+)
   if (level >= 2 && typeof value === 'string') {
@@ -442,7 +478,7 @@ function encodePrimitive(
     if (dictRef) return dictRef;
   }
 
-  return encodeTypedValue(value, level);
+  return encodeTypedValue(value, level, compactBoolean);
 }
 
 /**
@@ -477,7 +513,7 @@ function encodeInlineValue(
     const pairs: string[] = [];
     for (const [k, v] of Object.entries(value)) {
       if (v === undefined) continue;
-      pairs.push(`${escapeValue(k)}: ${encodeInlineValue(v, level, dictLookup, seen)}`);
+      pairs.push(`${escapeKey(k)}: ${encodeInlineValue(v, level, dictLookup, seen)}`);
     }
     return `{${pairs.join(', ')}}`;
   } finally {

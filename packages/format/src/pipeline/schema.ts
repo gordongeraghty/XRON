@@ -151,11 +151,16 @@ function detectFieldTypes(
         else if (t === 'null') schema.fieldTypes.set(fieldIdx, 'null');
         else if (t === 'date') schema.fieldTypes.set(fieldIdx, 'date');
         else if (t === 'bigint') schema.fieldTypes.set(fieldIdx, 'bigint');
-      } else if (types.has('boolean') && types.size <= 2) {
-        // boolean + null → still boolean
+      } else if (types.has('boolean') && types.size === 2 && types.has('null')) {
+        // boolean + null → still boolean. Nothing else may be folded in: the
+        // hint makes the decoder read every cell in the column as a boolean,
+        // so promoting boolean+number turned 385.005 into true.
         schema.fieldTypes.set(fieldIdx, 'boolean');
-      } else if (types.has('bigint') && !types.has('string') && !types.has('boolean') && !types.has('date')) {
-        // bigint (+ null or + number) → promote to bigint
+      } else if (types.has('bigint') && types.size === 2 && types.has('null')) {
+        // bigint + null → still bigint. Previously this also swallowed number,
+        // object and array columns, and the decoder then ran BigInt() over
+        // cells like "[1]" and threw. Values now carry their own 'n' marker,
+        // so a mixed column decodes correctly with no hint at all.
         schema.fieldTypes.set(fieldIdx, 'bigint');
       } else {
         schema.fieldTypes.set(fieldIdx, 'mixed');

@@ -195,19 +195,23 @@ export function resolveDictRef(ref: string, dictionary: string[]): string | null
   if (!ref.startsWith('$') || ref.length < 2) return null;
   const body = ref.slice(1);
 
-  // Try legacy numeric format first (backwards compatibility)
-  if (/^\d+$/.test(body)) {
-    const index = parseInt(body, 10);
-    if (index >= 0 && index < dictionary.length) {
-      return dictionary[index];
-    }
-    // Fall through to base-62 decode (e.g. $0 is both numeric 0 and b62 index 0)
-  }
-
-  // Base-62 decode
+  // Base-62 first: it is what createDictLookup emits, so it must win.
+  // A two-char all-digit body like "10" is base-62 124, not decimal 10 —
+  // decoding it as decimal silently returns the wrong entry once the
+  // dictionary passes 62 entries and two-char refs start appearing.
   const index = decodeDictIndex(body);
   if (index >= 0 && index < dictionary.length) {
     return dictionary[index];
+  }
+
+  // Legacy decimal refs ($0, $123) written by pre-base-62 encoders.
+  // Only reachable when the base-62 reading is out of range, so it can
+  // never shadow a ref this encoder produced.
+  if (/^\d+$/.test(body)) {
+    const legacy = parseInt(body, 10);
+    if (legacy >= 0 && legacy < dictionary.length) {
+      return dictionary[legacy];
+    }
   }
   return null;
 }
