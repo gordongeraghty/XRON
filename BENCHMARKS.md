@@ -2,6 +2,9 @@
 
 XRON is designed to solve the "token tax" of structured data in LLM context windows. This document provides empirical evidence from our benchmark suite comparing JSON (minified) against XRON Levels 1, 2, and 3.
 
+For the correctness side — how the lossless guarantee is tested, what was found,
+and the one known limitation — see [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
 ---
 
 ## 1. Token Count Comparison (BPE o200k_base)

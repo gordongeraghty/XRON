@@ -329,6 +329,10 @@ XRON is an **algorithmic encoder**, not an LLM summariser. It never drops, hallu
 - **Compress Native BigInt for AI**: Sequential `BigInt` columns compress smoothly without precision loss — no truncation, no rounding
 - **Never-worse guarantee**: Auto mode returns raw JSON if XRON would be larger
 
+**Full evidence:** [docs/VERIFICATION.md](docs/VERIFICATION.md) documents every
+test, every measurement, the fix-by-fix failure rates, and the one known
+limitation — with commands to reproduce each figure.
+
 ### How the guarantee is tested
 
 Losslessness is a single property, so it is tested as a single property rather
@@ -515,7 +519,7 @@ Yes. XRON's header-based schema (`@S`, `@D`, `@N`) is self-describing. GPT-4o, C
 
 For the supported shapes, yes — and it is tested as a property rather than asserted. `XRON.parse(XRON.stringify(data))` deep-equals the original input across `BigInt`, `Date`, `null`, nested objects and mixed arrays. The round-trip identity runs over a boundary-focused corpus at every level (1, 2, 3 and `auto`) as part of the 569-test suite, alongside property-based fuzzing over randomised payloads.
 
-There are five known inputs where it does not yet hold, including one affecting plain numeric data and one affecting Level 1. They are listed in [Known limitations](#known-limitations) and each is pinned by a failing-by-design test. Read that list before relying on the guarantee for arbitrary input.
+One failure in 42,000 randomised round-trips remains open — see [Known limitation](#known-limitation). Everything else previously listed there is fixed and now runs in the corpus at every level.
 
 Timestamps are the area worth understanding: XRON preserves the exact string you gave it. Where a compression layer could not reproduce a timestamp exactly — a column carrying UTC offsets, genuine sub-second precision, or a mix of date-only and datetime values — that layer declines to compress the column rather than approximating it. You trade a few bytes for the guarantee, and only on the columns that need it.
 
