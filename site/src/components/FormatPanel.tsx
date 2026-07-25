@@ -61,7 +61,7 @@ function renderLines(content: string, highlight: boolean): React.ReactNode[] {
   // Group spans by line
   const lineGroups: React.ReactNode[][] = [[]]
   for (const span of allSpans) {
-    if ((span as React.ReactElement).props?.['data-nl'] === 'true') {
+    if (((span as React.ReactElement).props as any)?.['data-nl'] === 'true') {
       lineGroups.push([])
     } else {
       lineGroups[lineGroups.length - 1].push(span)

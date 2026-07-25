@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink } from 'react-router'
 
 interface HeaderProps {
   darkMode: boolean
@@ -23,7 +23,7 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
         <nav className="flex items-center gap-1">
           <NavLink
             to="/spec"
-            className={({ isActive }) =>
+            className={({ isActive }: { isActive: boolean }) =>
               `px-3 py-1.5 rounded text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
                 isActive
                   ? 'text-violet-400 bg-violet-900/40'
@@ -35,7 +35,7 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
           </NavLink>
           <NavLink
             to="/playground"
-            className={({ isActive }) =>
+            className={({ isActive }: { isActive: boolean }) =>
               `px-3 py-1.5 rounded text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
                 isActive
                   ? 'text-violet-400 bg-violet-900/40'
