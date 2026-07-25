@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router'
 import Header from './components/Header'
 import Playground from './pages/Playground'
 import Spec from './pages/Spec'
