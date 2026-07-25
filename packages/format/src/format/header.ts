@@ -29,10 +29,26 @@ export function formatSchemaHeader(
   const name = level >= 2 ? schema.name : schema.fullName;
   const fields = schema.fields.map((f, i) => {
     const type = schema.fieldTypes.get(i);
-    if (type === 'boolean') return `${f}?b`;
-    if (type === 'date') return `${f}?d`;
-    if (type === 'bigint') return `${f}?i`;
-    return f;
+    const suffix =
+      type === 'boolean' ? '?b' :
+      type === 'date' ? '?d' :
+      type === 'bigint' ? '?i' : '';
+    // Field names were written raw into a comma-separated line, so a key
+    // containing a comma split into two columns, a key ending in "?b" was
+    // read as a type hint and renamed, and a hint appended to a name the bare
+    // pattern (\w+) cannot express — anything with a space — was left glued on
+    // as part of the key. Quote the name in all of those cases; the hint then
+    // sits outside the quotes where it is unambiguous.
+    const needsQuote =
+      /[",]/.test(f) ||
+      /\?[bnsdi]$/.test(f) ||
+      (suffix !== '' && !/^\w+$/.test(f)) ||
+      f !== f.trim() ||
+      f === '';
+    const encoded = needsQuote
+      ? `"${f.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+      : f;
+    return `${encoded}${suffix}`;
   }).join(', ');
   return `@S ${name}: ${fields}`;
 }
@@ -43,11 +59,18 @@ export function formatSchemaHeader(
  */
 export function formatDictHeader(values: string[]): string {
   if (values.length === 0) return '';
-  // Quote dictionary values that contain commas or double quotes,
-  // escaping internal backslashes and quotes first
+  // Quote any value the single-line, comma-separated @D format cannot carry
+  // verbatim. A raw newline ended the header line early and destroyed the rest
+  // of the document; leading/trailing whitespace was silently trimmed off on
+  // the way back in.
   const escaped = values.map(v => {
-    if (v.includes(',') || v.includes('"')) {
-      return `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    if (/[,"\n\r\t\\]/.test(v) || v !== v.trim() || v === '') {
+      return `"${v
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')}"`;
     }
     return v;
   });
@@ -85,22 +108,60 @@ export function parseSchemaHeader(
   const match = line.match(/^@S\s+(\w+)\s*:\s*(.+)$/);
   if (!match) return null;
   const name = match[1];
-  const rawFields = match[2].split(',').map(f => f.trim()).filter(f => f.length > 0);
+  // Split on commas that are outside quotes — a quoted field name may contain
+  // one. A plain split(',') turned the key "a,b" into two columns.
+  const rawFields: string[] = [];
+  {
+    let current = '';
+    let inQuotes = false;
+    let escaped = false;
+    for (let i = 0; i < match[2].length; i++) {
+      const ch = match[2][i];
+      if (escaped) { current += ch; escaped = false; continue; }
+      if (ch === '\\' && inQuotes) { current += ch; escaped = true; continue; }
+      if (ch === '"') { inQuotes = !inQuotes; current += ch; continue; }
+      if (ch === ',' && !inQuotes) { rawFields.push(current.trim()); current = ''; continue; }
+      current += ch;
+    }
+    if (current.trim().length > 0) rawFields.push(current.trim());
+  }
+
   const fields: string[] = [];
   const fieldTypes = new Map<number, string>();
 
+  const setType = (i: number, typeChar: string) => {
+    if (typeChar === 'b') fieldTypes.set(i, 'boolean');
+    else if (typeChar === 'n') fieldTypes.set(i, 'number');
+    else if (typeChar === 's') fieldTypes.set(i, 'string');
+    else if (typeChar === 'd') fieldTypes.set(i, 'date');
+    else if (typeChar === 'i') fieldTypes.set(i, 'bigint');
+  };
+
   for (let i = 0; i < rawFields.length; i++) {
-    const typeMatch = rawFields[i].match(/^(\w+)\?([bnsdi])$/);
+    const raw = rawFields[i];
+
+    if (raw.startsWith('"')) {
+      // Quoted name: read to the closing quote, then any hint sits after it.
+      let buf = '';
+      let j = 1;
+      for (; j < raw.length; j++) {
+        const ch = raw[j];
+        if (ch === '\\' && j + 1 < raw.length) { buf += raw[++j]; continue; }
+        if (ch === '"') break;
+        buf += ch;
+      }
+      fields.push(buf);
+      const hint = raw.slice(j + 1).match(/^\?([bnsdi])$/);
+      if (hint) setType(i, hint[1]);
+      continue;
+    }
+
+    const typeMatch = raw.match(/^(\w+)\?([bnsdi])$/);
     if (typeMatch) {
       fields.push(typeMatch[1]);
-      const typeChar = typeMatch[2];
-      if (typeChar === 'b') fieldTypes.set(i, 'boolean');
-      else if (typeChar === 'n') fieldTypes.set(i, 'number');
-      else if (typeChar === 's') fieldTypes.set(i, 'string');
-      else if (typeChar === 'd') fieldTypes.set(i, 'date');
-      else if (typeChar === 'i') fieldTypes.set(i, 'bigint');
+      setType(i, typeMatch[2]);
     } else {
-      fields.push(rawFields[i]);
+      fields.push(raw);
     }
   }
 
@@ -152,13 +213,29 @@ export function parseDictValues(input: string): string[] {
   let current = '';
   let inQuotes = false;
   let isEscaped = false;
+  // A quoted value is returned verbatim. Trimming is only safe for bare
+  // values, where surrounding space is formatting; inside quotes it is data,
+  // and formatDictHeader quotes precisely so it survives.
+  let wasQuoted = false;
+
+  const push = () => {
+    values.push(wasQuoted ? current : current.trim());
+    current = '';
+    wasQuoted = false;
+  };
 
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
 
     if (isEscaped) {
-      // Previous char was backslash — consume the escaped char literally
-      current += ch;
+      // Decode the escape rather than taking the character literally —
+      // otherwise "\n" came back as the letter n.
+      switch (ch) {
+        case 'n': current += '\n'; break;
+        case 'r': current += '\r'; break;
+        case 't': current += '\t'; break;
+        default: current += ch; break;
+      }
       isEscaped = false;
       continue;
     }
@@ -171,16 +248,22 @@ export function parseDictValues(input: string): string[] {
 
     if (ch === '"') {
       inQuotes = !inQuotes;
+      if (inQuotes) {
+        wasQuoted = true;
+        // Entries are joined with ", ", so an opening quote is preceded by the
+        // separator's space. That space is formatting, not data — drop it, or
+        // skipping the trim below would prepend it to every quoted value.
+        if (current.trim() === '') current = '';
+      }
       // Don't include the quote character in the value
     } else if (ch === ',' && !inQuotes) {
-      values.push(current.trim());
-      current = '';
+      push();
     } else {
       current += ch;
     }
   }
-  if (current.trim().length > 0) {
-    values.push(current.trim());
+  if (wasQuoted || current.trim().length > 0) {
+    push();
   }
   return values;
 }

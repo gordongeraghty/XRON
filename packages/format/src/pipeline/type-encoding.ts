@@ -214,7 +214,9 @@ function isCompactDate(value: string): boolean {
   // The year range no longer needs to be narrow: callers require a 'T'
   // separator, which already rules out confusion with an integer. The old
   // 1900-2100 clamp silently refused to expand valid dates outside it.
-  return year >= 1 && year <= 9999 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
+  // Year 0000 is a valid ISO year and compactDate happily compacts it, so the
+  // lower bound must admit it or the compacted form is never expanded back.
+  return year >= 0 && year <= 9999 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
 }
 
 // ─── UUID Base62 Compression ──────────────────────────────────────

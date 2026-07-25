@@ -163,7 +163,7 @@ losslessness claim:
 npx vitest run packages/format/tests/lossless-property.test.ts
 ```
 
-Or run everything (591 tests):
+Or run everything (759 tests):
 
 ```bash
 npm test

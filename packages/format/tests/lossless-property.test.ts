@@ -249,6 +249,124 @@ const corpus: Record<string, unknown> = {
     n: i,
   })),
 
+  // ── Shapes an independent fuzzer found that this corpus had missed ────
+  // Bare top-level non-finite numbers. Nested ones always became null (as
+  // JSON.stringify does); the standalone scalar path returned the string.
+  'nonfinite/bare NaN': NaN,
+  'nonfinite/bare Infinity': Infinity,
+  'nonfinite/bare -Infinity': -Infinity,
+  'nonfinite/nested': { a: [1, NaN], b: Infinity },
+
+  // Rows sharing a key set but not a key order. They must not share a schema:
+  // a schema carries one field order, so the second row was re-emitted in the
+  // first row's order.
+  'keyorder/rows with differing key order': [{ a: 1, b: 2 }, { b: 3, a: 4 }],
+  'keyorder/three orders of the same keys': [
+    { x: 1, y: 2, z: 3 },
+    { z: 4, y: 5, x: 6 },
+    { y: 7, x: 8, z: 9 },
+  ],
+
+  // A standalone object whose key set matches a nested object's. The outer
+  // object matched the schema, and its array field was run through
+  // String(value) — yielding the literal text "[object Object],false".
+  'shapecollision/object key set matches its nested object': {
+    foo: [{ foo: 1, bar: 2 }, false],
+    bar: 9,
+  },
+  'shapecollision/array field beside a matching nested shape': {
+    a: [{ a: 'x', b: 'y' }],
+    b: [1, 2, 3],
+  },
+
+  // Control characters inside dictionary entries. The @D header is a single
+  // comma-separated line, so a raw newline ended it early and destroyed the
+  // rest of the document.
+  'dictctl/repeated value with a trailing newline': {
+    a: 'x'.repeat(11) + '\n',
+    b: 'x'.repeat(11) + '\n',
+  },
+  'dictctl/repeated value with an embedded newline': rows(3, i => ({
+    id: i + 1,
+    desc: 'line one\nline two',
+  })),
+  'dictctl/repeated value with a tab': rows(3, i => ({ id: i + 1, d: 'aaaaaaaaaaa\tbbb' })),
+  'dictctl/repeated value with a carriage return': rows(3, i => ({
+    id: i + 1,
+    d: 'aaaaaaaaaaa\r\nbbb',
+  })),
+  'dictctl/repeated value with surrounding spaces': rows(3, i => ({
+    id: i + 1,
+    d: '   padded value here   ',
+  })),
+
+  // ── Unbalanced brackets in string values ──────────────────────────────
+  // splitRow/splitTopLevel treat ( [ { ) ] } as nesting depth. A lone closer
+  // drove the depth negative and the splitter stopped seeing separators, so
+  // the next field was swallowed into this value. Balanced runs are fine and
+  // stay unquoted, so ordinary prose costs nothing.
+  'brackets/lone closing square': { baz: 'p]', other: 1 },
+  'brackets/lone closing brace': { baz: 'p}', other: 1 },
+  'brackets/lone closing paren': { baz: 'p)', other: 1 },
+  'brackets/lone opening paren': { baz: 'p(', other: 1 },
+  'brackets/closers in schema rows': [{ a: 'x]y', b: 1 }, { a: 'z]w', b: 2 }],
+  'brackets/balanced stays intact': [{ a: 'Hello (world)', b: 1 }, { a: 'Bye (now)', b: 2 }],
+  'brackets/reversed order )( ': { a: ')(', b: 1 },
+  'brackets/nested unbalanced': rows(20, i => ({ n: i, s: `a[b{c(${i}` })),
+
+  // ── Date objects across levels ────────────────────────────────────────
+  // Compaction is only reversible at Level 2+, and a bare top-level scalar is
+  // never expanded at all, so those positions keep the ISO form.
+  'date/object field': { x: new Date('2024-06-15T10:20:30.123Z') },
+  'date/bare top level': new Date('2024-06-15T10:20:30.123Z'),
+  'date/in array': [new Date('2024-06-15T10:20:30.123Z')],
+  'date/in schema rows': rows(5, i => ({ n: i, d: new Date(Date.UTC(2024, 5, 15 + i)) })),
+
+  // ── Schema display-name collisions ────────────────────────────────────
+  // Level 1 writes fullName on the wire and the parser keys schemas by it, so
+  // two shapes guessed into the same name silently overwrote one another.
+  'schemaname/two shapes guessing the same name': [
+    { p: 1, q: 2, extra: [[{ m: 1, n: 2 }, { m: 3, n: 4 }]] },
+    { p: 3, q: 4, extra: [] },
+    { p: 5, q: 6, extra: [] },
+  ],
+
+  // ── Values colliding with the encoder's own sigils and header syntax ──
+  // Level 3 writes compacted UUIDs as ^<base62>, and the decoder treated any
+  // unquoted leading '^' as one — so "^abc" became a UUID and "^!!!" threw.
+  'sigil/caret prefix': { x: '^abc' },
+  'sigil/caret with invalid base62': { x: '^!!!' },
+  'sigil/caret in rows': rows(20, i => ({ n: i, s: `^tag${i % 4}` })),
+  // A literal string shaped like the encoder's own compact-date output.
+  'sigil/compact-date lookalike': { d: '20240615T102030Z' },
+  'sigil/compact-date lookalike in rows': rows(20, i => ({ n: i, d: '20240615T102030Z' })),
+  // Strings that are XRON header lines.
+  'sigil/header-shaped strings': {
+    a: '@v3', b: '@S A: x', c: '@N5 A', d: '@D:', e: '@X: 0', f: '@T 0: a{}', g: '@P: x',
+  },
+  'sigil/schema-reference lookalike': { a: 'A(1, 2)', b: '%0;' },
+
+  // ── Field names the @S header could not carry ─────────────────────────
+  'keyname/comma in key': [{ 'a,b': 1, c: 2 }, { 'a,b': 3, c: 4 }],
+  'keyname/key ending in a type hint': [{ 'a?b': 1, c: 2 }, { 'a?b': 3, c: 4 }],
+  'keyname/key with a space carrying a hint': [
+    { 'my field': 5n, x: 1 },
+    { 'my field': 6n, x: 2 },
+  ],
+  'keyname/quote in key': [{ 'a"b': 1, c: 2 }, { 'a"b': 3, c: 4 }],
+  'keyname/key that looks like a header': [{ '@S x': 1, c: 2 }, { '@S x': 3, c: 4 }],
+
+  // ── Year 0000 ────────────────────────────────────────────────────────
+  'edge/year 0000': { d: '0000-01-01T00:00:00.000Z' },
+
+  // ── Anonymous 2D arrays holding structures ───────────────────────────
+  // encode2DArray writes object/array cells with encodeInlineValue, but the
+  // anonymous-array decoder ran every cell through the scalar path, so they
+  // came back as their own source text.
+  'array2d/cells holding objects': [[{ a: 1 }, { b: 2 }], [{ a: 3 }, { b: 4 }]],
+  'array2d/cells holding arrays': [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],
+  'array2d/mixed scalar and object cells': [[{ a: 1 }, 2], [{ a: 3 }, 4]],
+
   // ── Combined: dates and a large dictionary in one payload ─────────────
   'combined/dates plus 120-entry dictionary': (() => {
     const words = rows(120, i => `longtoken_${String(i).padStart(3, '0')}`)

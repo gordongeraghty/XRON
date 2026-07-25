@@ -191,7 +191,8 @@ function parseDocument(input: string, strict = false): XronDocument {
             name: s.name,
             fullName: s.name,
             fields: s.fields,
-            signature: s.fields.slice().sort().join(','),
+            // Order-sensitive, matching how the encoder computes signatures.
+            signature: s.fields.join(','),
             frequency: 0,
             nestedSchemas: new Map(),
             fieldTypes: s.fieldTypes as Map<number, 'boolean' | 'number' | 'string' | 'null' | 'date' | 'mixed' | 'bigint'>,
@@ -317,7 +318,19 @@ function parseDataSection(
       const row = cells[i];
       const newRow = new Array(row.length);
       for (let j = 0; j < row.length; j++) {
-        newRow[j] = decodeRawValue(row[j].trim(), version, dictionary);
+        const raw = row[j].trim();
+        // Inline objects and arrays must be dispatched the same way the
+        // schema-row decoder does it. Without this, encode2DArray's
+        // encodeInlineValue output came straight back as its own source text —
+        // [[{a:1}]] decoded to [["{a: 1}"]], an object silently becoming a
+        // string.
+        if (raw.startsWith('[') && raw.endsWith(']')) {
+          newRow[j] = parseInlineBracketArray(raw, version, dictionary, schemasByName);
+        } else if (raw.startsWith('{') && raw.endsWith('}')) {
+          newRow[j] = parseInlineBracketObject(raw, version, dictionary);
+        } else {
+          newRow[j] = decodeRawValue(raw, version, dictionary);
+        }
       }
       result[i] = newRow;
     }
