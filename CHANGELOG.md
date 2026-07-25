@@ -2,7 +2,7 @@
 
 ## xron-format 0.4.0
 
-Fixes fourteen silent data-corruption bugs. Every one returned wrong data
+Fixes twenty-one silent data-corruption bugs. Every one returned wrong data
 without throwing. Anything encoded with 0.3.0 or earlier should be re-encoded
 and re-verified.
 

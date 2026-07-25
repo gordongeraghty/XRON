@@ -110,7 +110,7 @@ Because XRON targets LLMs, a common concern is the "hallucination" of data durin
 - **Native BigInt Support:** XRON dynamically manages integer precision via Level 3 BigInt Delta calculation heuristics out-of-the-box. Sequential `BigInt` columns (e.g. `9999999999999999999n`) compress smoothly (`+1`) without Javascript math degradation.
 
 > **Full evidence:** [docs/VERIFICATION.md](docs/VERIFICATION.md) records every
-> test, the sixteen corruption bugs found and fixed in 0.4.0, the fix-by-fix
+> test, the twenty-one corruption bugs found and fixed in 0.4.0, the fix-by-fix
 > failure rates, and what a zero failure rate does and does not establish —
 > with commands to reproduce every figure.
 

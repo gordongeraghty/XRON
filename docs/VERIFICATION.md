@@ -88,7 +88,7 @@ cd packages/format && npm pack
 
 ## 3. What was found
 
-Sixteen silent data-corruption bugs. Every one returned wrong data **without
+Twenty-one silent data-corruption bugs. Every one returned wrong data **without
 throwing** — no exception, no warning, just different data.
 
 ### Temporal
@@ -130,7 +130,7 @@ class (`Cannot read properties of undefined`).
 
 ### The two root causes
 
-These are not sixteen unrelated defects. They reduce to two:
+These are not twenty-one unrelated defects. They reduce to two:
 
 1. **The decoder re-derived decisions the encoder had already made** — inferring
    delta columns from a leading `+`/`-`, and date-ness from an 8-digit
