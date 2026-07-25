@@ -313,40 +313,64 @@ function detectDeltaPotential(
   for (const schema of schemas.values()) {
     if (schema.frequency < deltaThreshold) continue;
 
-    // Sample items that match this schema
-    const sample = data
-      .filter((item): item is Record<string, unknown> =>
-        item !== null && typeof item === 'object' && !Array.isArray(item))
-      .slice(0, Math.min(data.length, 20));
+    // ⚡ Bolt Optimization: Use an imperative loop for sampling to avoid O(N) array traversals
+    // and multiple memory allocations caused by `.filter().slice()` on large datasets.
+    const sample: Record<string, unknown>[] = [];
+    const limit = Math.min(data.length, 20);
+    for (let i = 0; i < data.length && sample.length < limit; i++) {
+      const item = data[i];
+      if (item !== null && typeof item === 'object' && !Array.isArray(item)) {
+        sample.push(item as Record<string, unknown>);
+      }
+    }
 
     for (let fi = 0; fi < schema.fields.length; fi++) {
       const field = schema.fields[fi];
 
-      // Check numeric sequential
-      const numVals = sample
-        .map(item => item[field])
-        .filter(v => typeof v === 'number' && isFinite(v as number)) as number[];
-
-      if (numVals.length >= deltaThreshold) {
-        const deltas = numVals.slice(1).map((v, i) => v - numVals[i]);
-        if (deltas.length > 0 && deltas.every(d => d === deltas[0])) {
-          return true;
+      // ⚡ Bolt Optimization: Use imperative loops instead of `.map().filter()` to avoid
+      // intermediate array allocations. Extract values and calculate deltas in place.
+      const numVals: number[] = [];
+      for (let i = 0; i < sample.length; i++) {
+        const v = sample[i][field];
+        if (typeof v === 'number' && isFinite(v)) {
+          numVals.push(v);
         }
       }
 
-      // Check temporal sequential (ISO date strings)
-      const dateVals = sample
-        .map(item => item[field])
-        .filter(v => typeof v === 'string' && ISO_DATE_RE_ADAPTIVE.test(v as string)) as string[];
-
-      if (dateVals.length >= deltaThreshold) {
-        const epochs = dateVals.map(v => new Date(v).getTime());
-        if (epochs.every(e => !isNaN(e))) {
-          const deltas = epochs.slice(1).map((v, i) => v - epochs[i]);
-          if (deltas.length > 0 && deltas.every(d => d === deltas[0])) {
-            return true;
+      if (numVals.length >= deltaThreshold) {
+        let isSequential = true;
+        const expectedDelta = numVals[1] - numVals[0];
+        for (let i = 2; i < numVals.length; i++) {
+          if (numVals[i] - numVals[i - 1] !== expectedDelta) {
+            isSequential = false;
+            break;
           }
         }
+        if (isSequential) return true;
+      }
+
+      // ⚡ Bolt Optimization: Calculate temporal epochs without instantiating mapped arrays
+      const epochs: number[] = [];
+      for (let i = 0; i < sample.length; i++) {
+        const v = sample[i][field];
+        if (typeof v === 'string' && ISO_DATE_RE_ADAPTIVE.test(v)) {
+          const epoch = new Date(v).getTime();
+          if (!isNaN(epoch)) {
+            epochs.push(epoch);
+          }
+        }
+      }
+
+      if (epochs.length >= deltaThreshold) {
+        let isSequential = true;
+        const expectedDelta = epochs[1] - epochs[0];
+        for (let i = 2; i < epochs.length; i++) {
+          if (epochs[i] - epochs[i - 1] !== expectedDelta) {
+            isSequential = false;
+            break;
+          }
+        }
+        if (isSequential) return true;
       }
     }
   }

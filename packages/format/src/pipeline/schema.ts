@@ -94,6 +94,11 @@ function collectShapes(
 
   const keys = Object.keys(value);
   if (keys.length >= 2) {
+    // .slice() is required, not incidental: sort() mutates in place, and `keys`
+    // is stored below as the schema's field order. Sorting it directly
+    // alphabetises every object's fields on decode — {n, code} came back as
+    // {code, n} — which breaks the round-trip identity even though the values
+    // are intact.
     const signature = keys.slice().sort().join(',');
     const existing = shapes.get(signature);
     if (existing) {
@@ -231,7 +236,7 @@ function resolveNestedSchemas(
         if (fieldValue !== null && typeof fieldValue === 'object' && !Array.isArray(fieldValue)) {
           const nestedKeys = Object.keys(fieldValue);
           if (nestedKeys.length >= 1) {
-            const nestedSig = nestedKeys.slice().sort().join(',');
+            const nestedSig = nestedKeys.sort().join(',');
             const nestedSchemaName = sigToSchema.get(nestedSig);
             if (nestedSchemaName) {
               if (matchedSchema === null) {
@@ -283,6 +288,8 @@ function collectInstances(value: any, signature: string, results: any[]): void {
   if (typeof value === 'object') {
     const keys = Object.keys(value);
     if (keys.length >= 1) {
+      // Copy before sorting: `keys` drives the traversal below, and reordering
+      // it changes the order instances are collected in — i.e. the row order.
       const sig = keys.slice().sort().join(',');
       if (sig === signature) {
         results.push(value);
@@ -304,6 +311,6 @@ export function matchSchema(
 ): SchemaDefinition | null {
   const keys = Object.keys(obj);
   if (keys.length < 1) return null;
-  const signature = keys.slice().sort().join(',');
+  const signature = keys.sort().join(',');
   return schemas.get(signature) ?? null;
 }

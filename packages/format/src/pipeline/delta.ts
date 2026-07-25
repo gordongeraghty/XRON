@@ -116,7 +116,10 @@ export function analyzeDeltaColumns(
   const deltaColumns: DeltaColumnInfo[] = [];
 
   for (let col = 0; col < schema.fields.length; col++) {
-    const values = rows.map(row => row[col]);
+    const values = new Array(rows.length);
+    for (let r = 0; r < rows.length; r++) {
+      values[r] = rows[r][col];
+    }
 
     // Check for temporal (ISO date string) sequential pattern first
     const temporalInfo = analyzeTemporalColumn(values, col);
@@ -156,7 +159,10 @@ function analyzeTemporalColumn(
   if (!values.every(v => temporalShape(v as string) === shape)) return null;
 
   // Convert to epoch seconds
-  const epochs: number[] = values.map(v => Math.floor(new Date(v as string).getTime() / 1000));
+  const epochs: number[] = new Array(values.length);
+  for (let r = 0; r < values.length; r++) {
+    epochs[r] = Math.floor(new Date(values[r] as string).getTime() / 1000);
+  }
 
   // Verify all parsed correctly
   if (epochs.some(e => isNaN(e))) return null;
@@ -172,12 +178,25 @@ function analyzeTemporalColumn(
 
   // Delta encoding is beneficial if deltas are small relative to absolute values
   // For dates, deltas are almost always much smaller (e.g. 86400s vs 1777000000s)
-  const avgAbsValue = epochs.reduce((sum, v) => sum + Math.abs(v), 0) / epochs.length;
-  const avgAbsDelta = deltas.reduce((sum, d) => sum + Math.abs(d), 0) / deltas.length;
+  if (!isConstant) {
+    let sumValue = 0;
+    for (let i = 0; i < epochs.length; i++) {
+      const v = epochs[i];
+      sumValue += v < 0 ? -v : v;
+    }
+    const avgAbsValue = sumValue / epochs.length;
 
-  // Dates virtually always benefit — deltas are tiny vs epoch values
-  if (!isConstant && avgAbsDelta >= avgAbsValue * 0.5) {
-    return null;
+    let sumDelta = 0;
+    for (let i = 0; i < deltas.length; i++) {
+      const d = deltas[i];
+      sumDelta += d < 0 ? -d : d;
+    }
+    const avgAbsDelta = sumDelta / deltas.length;
+
+    // Dates virtually always benefit — deltas are tiny vs epoch values
+    if (avgAbsDelta >= avgAbsValue * 0.5) {
+      return null;
+    }
   }
 
   return {
@@ -206,7 +225,10 @@ function analyzeNumericColumn(
       typeof v === 'bigint' || (typeof v === 'number' && Number.isInteger(v))
     )) return null;
 
-    const bigValues: bigint[] = values.map(v => BigInt(v as number | bigint));
+    const bigValues: bigint[] = new Array(values.length);
+    for (let r = 0; r < values.length; r++) {
+      bigValues[r] = BigInt(values[r] as number | bigint);
+    }
     const deltas: bigint[] = [];
     for (let i = 1; i < bigValues.length; i++) {
       deltas.push(bigValues[i] - bigValues[i - 1]);
@@ -214,11 +236,24 @@ function analyzeNumericColumn(
 
     const isConstant = deltas.every(d => d === deltas[0]);
 
-    const avgAbsValue = bigValues.reduce((sum, v) => sum + (v < 0n ? -v : v), 0n) / BigInt(bigValues.length);
-    const avgAbsDelta = deltas.reduce((sum, d) => sum + (d < 0n ? -d : d), 0n) / BigInt(deltas.length);
+    if (!isConstant) {
+      let sumValue = 0n;
+      for (let i = 0; i < bigValues.length; i++) {
+        const v = bigValues[i];
+        sumValue += v < 0n ? -v : v;
+      }
+      const avgAbsValue = sumValue / BigInt(bigValues.length);
 
-    if (!isConstant && avgAbsDelta >= avgAbsValue / 2n) {
-      return null;
+      let sumDelta = 0n;
+      for (let i = 0; i < deltas.length; i++) {
+        const d = deltas[i];
+        sumDelta += d < 0n ? -d : d;
+      }
+      const avgAbsDelta = sumDelta / BigInt(deltas.length);
+
+      if (avgAbsDelta >= avgAbsValue / 2n) {
+        return null;
+      }
     }
 
     return {
@@ -245,11 +280,24 @@ function analyzeNumericColumn(
   // Delta encoding is beneficial if:
   // - All deltas are the same constant (e.g., incrementing IDs)
   // - OR delta values are smaller than absolute values (saves digits)
-  const avgAbsValue = values.reduce((sum, v) => sum + Math.abs(v), 0) / values.length;
-  const avgAbsDelta = deltas.reduce((sum, d) => sum + Math.abs(d), 0) / deltas.length;
+  if (!isConstant) {
+    let sumValue = 0;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      sumValue += v < 0 ? -v : v;
+    }
+    const avgAbsValue = sumValue / values.length;
 
-  if (!isConstant && avgAbsDelta >= avgAbsValue * 0.5) {
-    return null; // Delta encoding would not save enough
+    let sumDelta = 0;
+    for (let i = 0; i < deltas.length; i++) {
+      const d = deltas[i];
+      sumDelta += d < 0 ? -d : d;
+    }
+    const avgAbsDelta = sumDelta / deltas.length;
+
+    if (avgAbsDelta >= avgAbsValue * 0.5) {
+      return null; // Delta encoding would not save enough
+    }
   }
 
   return {
@@ -272,7 +320,16 @@ export function applyDeltaEncoding(
 ): string[][] {
   if (rows.length === 0 || deltaColumns.length === 0) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
 
   for (const deltaInfo of deltaColumns) {
     const col = deltaInfo.columnIndex;
@@ -322,8 +379,21 @@ export function applyRepeatEncoding(
 ): string[][] {
   if (rows.length < 2) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
-  const deltaColSet = new Set(deltaColumns.map(d => d.columnIndex));
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
+
+  const deltaColSet = new Set<number>();
+  for (let i = 0; i < deltaColumns.length; i++) {
+    deltaColSet.add(deltaColumns[i].columnIndex);
+  }
 
   for (let col = 0; col < (rows[0]?.length ?? 0); col++) {
     // Skip delta-encoded columns
@@ -351,7 +421,16 @@ export function decodeDeltaRows(
 ): string[][] {
   if (rows.length === 0) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
 
   for (const col of deltaColumns) {
     const isTemporal = temporalColumns?.has(col) ?? false;
@@ -428,7 +507,16 @@ export function decodeDeltaRows(
 export function decodeRepeatRows(rows: string[][]): string[][] {
   if (rows.length < 2) return rows;
 
-  const result: string[][] = rows.map(row => [...row]);
+  const result: string[][] = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const len = row.length;
+    const newRow = new Array(len);
+    for (let c = 0; c < len; c++) {
+      newRow[c] = row[c];
+    }
+    result[r] = newRow;
+  }
 
   for (let col = 0; col < (rows[0]?.length ?? 0); col++) {
     for (let row = 1; row < result.length; row++) {

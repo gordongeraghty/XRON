@@ -45,9 +45,11 @@ export function encodePositionalRows(
         // Encode as nested schema reference: SchemaName(val1, val2, ...)
         const nestedSchema = findSchemaByName(allSchemas, nestedSchemaName);
         if (nestedSchema) {
-          const nestedValues = nestedSchema.fields.map(f => {
-            return encodeValue(value[f], allSchemas);
-          });
+          const len = nestedSchema.fields.length;
+          const nestedValues = new Array(len);
+          for (let j = 0; j < len; j++) {
+            nestedValues[j] = encodeValue(value[nestedSchema.fields[j]], allSchemas);
+          }
           const displayName = level >= 2 ? nestedSchema.name : nestedSchema.fullName;
           values.push(`${displayName}(${nestedValues.join(', ')})`);
         } else {

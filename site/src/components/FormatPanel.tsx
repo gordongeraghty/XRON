@@ -129,7 +129,8 @@ export default function FormatPanel({
         <button
           onClick={handleCopy}
           title="Copy to clipboard"
-          className="mt-1 p-1.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-xs"
+          aria-label={copied ? "Copied to clipboard" : "Copy to clipboard"}
+          className="mt-1 p-1.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
         >
           {copied ? (
             <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -294,14 +294,22 @@ function encode2DArray(
 
   // Encode each inner array as a row of values
   // Use encodeInlineValue for non-primitives (objects, arrays) to preserve structure
-  const rows: string[][] = arr.map(innerArr =>
-    innerArr.map(val => {
+  const len = arr.length;
+  const rows: string[][] = new Array(len);
+  for (let i = 0; i < len; i++) {
+    const innerArr = arr[i];
+    const innerLen = innerArr.length;
+    const row = new Array(innerLen);
+    for (let j = 0; j < innerLen; j++) {
+      const val = innerArr[j];
       if (val !== null && typeof val === 'object') {
-        return encodeInlineValue(val, level, dictLookup, seen);
+        row[j] = encodeInlineValue(val, level, dictLookup, seen);
+      } else {
+        row[j] = encodePrimitive(val, level, dictLookup);
       }
-      return encodePrimitive(val, level, dictLookup);
-    })
-  );
+    }
+    rows[i] = row;
+  }
 
   // Apply dictionary-based compression at Level 2+
   if (level >= 2 && rows.length >= 2) {
@@ -362,12 +370,27 @@ function encodeSchemaArray(
 
   // Compression Pipeline
   if (level >= 2 && rows.length >= 2) {
-    let parsed2D = rows.map(row => splitRow(row));
+    const rLen = rows.length;
+    let parsed2D = new Array(rLen);
+    for (let i = 0; i < rLen; i++) {
+      parsed2D[i] = splitRow(rows[i]);
+    }
 
     // 1. Delta & Repeat Encoding (Level 3)
     let deltaColumnsInfo = [] as any[];
     if (level >= 3 && rows.length >= opts.deltaThreshold) {
-      const rawRows = arr.map(item => schema.fields.map(f => item[f]));
+      const len = arr.length;
+      const numFields = schema.fields.length;
+      const fields = schema.fields;
+      const rawRows = new Array(len);
+      for (let i = 0; i < len; i++) {
+        const item = arr[i];
+        const row = new Array(numFields);
+        for (let j = 0; j < numFields; j++) {
+          row[j] = item[fields[j]];
+        }
+        rawRows[i] = row;
+      }
       deltaColumnsInfo = analyzeDeltaColumns(rawRows, schema, opts.deltaThreshold);
 
       // Dictionary substitution (Layer 3) already ran, so a repeated date may

@@ -34,7 +34,10 @@ export function detectColumnTemplates(
 
   for (let col = 0; col < numCols; col++) {
     // Collect all values in this column
-    const values = cells.map(row => row[col] ?? '');
+    const values = new Array<string>(cells.length);
+    for (let i = 0; i < cells.length; i++) {
+        values[i] = cells[i][col] ?? '';
+    }
 
     // Skip columns with dict refs ($N), delta (+N), repeat (~), or empty values
     if (values.some(v =>
@@ -88,17 +91,24 @@ export function applyColumnTemplates(
 ): string[][] {
   if (templates.length === 0) return cells;
 
-  return cells.map(row => {
-    const newRow = [...row];
-    for (const tmpl of templates) {
+  const result = new Array<string[]>(cells.length);
+  for (let i = 0; i < cells.length; i++) {
+    const row = cells[i];
+    const newRow = new Array<string>(row.length);
+    for (let j = 0; j < row.length; j++) {
+      newRow[j] = row[j];
+    }
+    for (let j = 0; j < templates.length; j++) {
+      const tmpl = templates[j];
       const val = newRow[tmpl.columnIndex] ?? '';
       // Strip prefix and suffix to get the variable part
       const endIdx = tmpl.suffix.length > 0 ? val.length - tmpl.suffix.length : val.length;
       const variable = val.slice(tmpl.prefix.length, endIdx);
       newRow[tmpl.columnIndex] = variable;
     }
-    return newRow;
-  });
+    result[i] = newRow;
+  }
+  return result;
 }
 
 /**
@@ -111,14 +121,21 @@ export function expandColumnTemplates(
 ): string[][] {
   if (templates.length === 0) return cells;
 
-  return cells.map(row => {
-    const newRow = [...row];
-    for (const tmpl of templates) {
+  const result = new Array<string[]>(cells.length);
+  for (let i = 0; i < cells.length; i++) {
+    const row = cells[i];
+    const newRow = new Array<string>(row.length);
+    for (let j = 0; j < row.length; j++) {
+      newRow[j] = row[j];
+    }
+    for (let j = 0; j < templates.length; j++) {
+      const tmpl = templates[j];
       const variable = newRow[tmpl.columnIndex] ?? '';
       newRow[tmpl.columnIndex] = tmpl.prefix + variable + tmpl.suffix;
     }
-    return newRow;
-  });
+    result[i] = newRow;
+  }
+  return result;
 }
 
 /**
