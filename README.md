@@ -1,12 +1,12 @@
-# XRON: Cut LLM Token Costs by 80% — Lossless Compression for AI Context Windows
+# XRON: Cut LLM Token Costs by up to 80% — Lossless Compression for AI Context Windows
 
 ![XRON — Lossless LLM Token Compression](assets/og_image.png)
 
-**XRON is a drop-in replacement for JSON in LLM prompts.** Lossless JSON compression for LLMs that preserves exact data types — including Native BigInt for AI — and reduces token costs by up to 80% with zero information loss.
+**XRON is a drop-in replacement for JSON in LLM prompts.** Lossless JSON compression for LLMs that preserves exact data types — including Native BigInt for AI — with zero information loss. Up to 80% fewer tokens on wide tables with repeated values, and around 50% on typical business records.
 
 [![npm version](https://img.shields.io/npm/v/xron-format.svg)](https://www.npmjs.com/package/xron-format)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/github/actions/workflow/status/gordongeraghty/XRON/ci.yml?label=557%20tests)](https://github.com/gordongeraghty/XRON/actions)
+[![Tests](https://img.shields.io/github/actions/workflow/status/gordongeraghty/XRON/ci.yml?label=569%20tests)](https://github.com/gordongeraghty/XRON/actions)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-first--class-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Specification](https://img.shields.io/badge/Spec-FORMAT__SPEC-orange)](FORMAT_SPEC.md)
@@ -38,15 +38,25 @@ const restored = XRON.parse(compressed);
 
 Every structured payload you send to an LLM has a hidden tax: JSON's repeated keys, quotes, braces, and brackets consume thousands of tokens that carry zero information. On a 500-row dataset, that overhead adds up to **~20,000 wasted tokens per request**.
 
-**XRON eliminates that waste:**
+**XRON eliminates that waste.** How much you save depends on how much of your
+JSON was structure rather than information — measured with the real `o200k_base`
+tokenizer, not an estimate:
 
-| Dataset | JSON Tokens | XRON Tokens | Reduction | Savings at $2.50/MTok |
-|---------|------------:|------------:|----------:|----------------------:|
-| 10 rows | 569 | 217 | **62%** | $0.0009/req |
-| 100 rows | 5,681 | 1,646 | **71%** | $0.010/req |
-| 500 rows | 28,401 | 7,966 | **72%** | $0.051/req |
+| Your data looks like | JSON | XRON | Reduction |
+|---|---:|---:|---:|
+| Wide tables, repeated values (30 cols, small vocabulary) | 150,003 | 30,261 | **~80%** |
+| Highly repetitive rows, long string values | — | — | **up to 91%** |
+| Long column names, small values (20 cols) | 140,002 | 29,760 | **~79%** |
+| Boolean/flag matrices (20 cols) | 70,002 | 20,161 | **~71%** |
+| Typical business records (6 fields, 500 rows) | 14,502 | 7,571 | **~48%** |
 
-At 1,000 requests/day with 500-row payloads, that's **~$51/day** or **~$18,600/year** saved on input tokens alone.
+The pattern is simple: XRON deletes repeated keys and repeated values, so the
+more of your payload is structure, the more you save. A wide table of categorical
+values is mostly structure. A narrow table of unique emails is mostly
+information, and information cannot be deleted losslessly.
+
+At 1,000 requests/day on a wide 500-row payload, ~80% reduction is roughly
+**$100/day** of input tokens at $2.50/MTok.
 
 ---
 
@@ -132,7 +142,8 @@ XRON applies nine progressive compression layers. Each builds on the previous:
 +1	Bob	bob	$1	0
 ```
 
-Same data. **80% fewer tokens.** Lossless.
+Same data, lossless. The reduction on any given payload depends on its shape —
+see [the table above](#the-problem-jsons-hidden-token-tax) for measured figures.
 
 ---
 
@@ -314,7 +325,7 @@ Adds column templates, substring dictionaries, delta encoding, repeat markers, t
 XRON is an **algorithmic encoder**, not an LLM summariser. It never drops, hallucinates, or estimates data.
 
 - **Lossless for the supported shapes**: exact data types — including `BigInt`, `Date`, `null`, nested objects — are preserved through round-trip serialisation, within the scope recorded under [Known limitations](#known-limitations) below
-- **Generative CI testing**: 557 tests including property-based fuzzing with random payloads on every commit
+- **Generative CI testing**: 569 tests including property-based fuzzing with random payloads on every commit
 - **Compress Native BigInt for AI**: Sequential `BigInt` columns compress smoothly without precision loss — no truncation, no rounding
 - **Never-worse guarantee**: Auto mode returns raw JSON if XRON would be larger
 
@@ -502,7 +513,7 @@ Yes. XRON's header-based schema (`@S`, `@D`, `@N`) is self-describing. GPT-4o, C
 
 ### Is XRON truly lossless?
 
-For the supported shapes, yes — and it is tested as a property rather than asserted. `XRON.parse(XRON.stringify(data))` deep-equals the original input across `BigInt`, `Date`, `null`, nested objects and mixed arrays. The round-trip identity runs over a boundary-focused corpus at every level (1, 2, 3 and `auto`) as part of the 557-test suite, alongside property-based fuzzing over randomised payloads.
+For the supported shapes, yes — and it is tested as a property rather than asserted. `XRON.parse(XRON.stringify(data))` deep-equals the original input across `BigInt`, `Date`, `null`, nested objects and mixed arrays. The round-trip identity runs over a boundary-focused corpus at every level (1, 2, 3 and `auto`) as part of the 569-test suite, alongside property-based fuzzing over randomised payloads.
 
 There are five known inputs where it does not yet hold, including one affecting plain numeric data and one affecting Level 1. They are listed in [Known limitations](#known-limitations) and each is pinned by a failing-by-design test. Read that list before relying on the guarantee for arbitrary input.
 

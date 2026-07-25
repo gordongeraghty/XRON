@@ -6,17 +6,62 @@ XRON is designed to solve the "token tax" of structured data in LLM context wind
 
 ## 1. Token Count Comparison (BPE o200k_base)
 
-The following tests were performed using a standard employee dataset (id, name, email, department, active status, salary). Tokens are estimated using a standard LLM BPE tokenizer heuristic.
+Measured by encoding with the real `gpt-tokenizer` implementation of
+`o200k_base` — the tokenizer GPT-4o actually uses — not by estimating.
 
-| Dataset Size | JSON (Tokens) | XRON L1 (Tokens) | XRON L2 (Tokens) | XRON L3 (Tokens) | **L3 % Reduction** |
-|--------------|---------------|------------------|------------------|------------------|-------------------|
-| **10 rows**  | 569           | 259              | 244              | 217              | **62%**           |
-| **50 rows**  | 2,841         | 1,171            | 998              | 856              | **70%**           |
-| **100 rows** | 5,681         | 2,311            | 1,928            | 1,646            | **71%**           |
-| **500 rows** | 28,401        | 11,431           | 9,368            | 7,966            | **72%**           |
+**Important:** an earlier version of this table reported 62–72% for this
+dataset. Those figures came from the library's internal character-based
+estimator (`estimateTokens`), which is not accurate for BPE. The numbers below
+are what a real tokenizer returns. They are lower, and they are correct.
 
-### Key Takeaway
-At 500 rows, XRON L3 saves over **20,000 tokens** compared to JSON. In a GPT-4o context, this single optimization can save you Context Window space equivalent to ~15 extra pages of documentation.
+Standard employee dataset (id, name, email, department, active, salary):
+
+| Dataset Size | JSON | XRON L1 | XRON L2 | XRON L3 | **Best % Reduction** |
+|---|---|---|---|---|---|
+| **10 rows**  | 292    | 215   | 238   | 219   | **26.4%** |
+| **50 rows**  | 1,452  | 934   | 963   | 822   | **43.4%** |
+| **100 rows** | 2,902  | 1,834 | 1,863 | 1,574 | **45.8%** |
+| **500 rows** | 14,502 | 9,034 | 9,064 | 7,571 | **47.8%** |
+
+### Why this dataset caps out near 48%
+
+There is a hard floor. The values themselves must still appear in the output,
+and for this dataset the values alone — no keys, no punctuation, no structure —
+cost **6,999 tokens, or 48% of the JSON total**. That puts the theoretical
+ceiling at roughly 52% for *any* lossless format. XRON reaches 47.8% of that
+available 52%.
+
+Reduction is therefore a property of your data, not only of the encoder: it
+measures how much of your payload was structure rather than information.
+
+## 1b. Reduction by Data Shape
+
+| Shape | JSON | XRON | Reduction |
+|---|---:|---:|---:|
+| Identical repeated rows, long string values | — | — | **up to 91%** |
+| 30 columns, 4-value vocabulary, 500 rows | 150,003 | 30,261 | **79.8%** |
+| Long column names, small values, 500×20 | 140,002 | 29,760 | **78.7%** |
+| 60 columns, 2-value vocabulary, 500 rows | 315,003 | 90,390 | **71.3%** |
+| Booleans only, 500×20 | 70,002 | 20,161 | **71.2%** |
+| Wide + repetitive, 500×12 | 30,003 | 12,057 | **59.8%** |
+| Employee records, 500 rows | 14,502 | 7,571 | **47.8%** |
+| Unique UUIDs, 500 rows | 11,502 | 9,035 | **21.4%** |
+
+The 80% headline is real and reproducible — on wide tables with repeated
+values. Narrow tables of unique strings are near their information floor and
+cannot go much further.
+
+### Known headroom
+
+A token-attribution study of the 500-row employee output found that two
+compression layers are currently *net-negative* under real BPE tokenization:
+
+- **Delta encoding**: `+1000` is 3 tokens; the absolute value `51000` is 2.
+- **Dictionary refs**: `Sales` is 1 token; `$0` is 2.
+
+Both layers decide using a `ceil(length / 4)` character heuristic rather than
+real token cost. Making those two decisions token-aware measures at **60.7%**
+reduction on the same dataset, up from 47.8%. That work is not in this release.
 
 ---
 
@@ -114,7 +159,7 @@ losslessness claim:
 npx vitest run packages/format/tests/lossless-property.test.ts
 ```
 
-Or run everything (557 tests):
+Or run everything (569 tests):
 
 ```bash
 npm test

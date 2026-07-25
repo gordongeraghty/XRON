@@ -1,6 +1,6 @@
 {
   "name": "xron-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "bin": {
     "xron": "./dist/index.js"
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "xron-format": "*"
+    "xron-format": "^0.4.0"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
