@@ -102,15 +102,15 @@ Because XRON targets LLMs, a common concern is the "hallucination" of data durin
 - **Strictly Lossless:** The exact data type topology (including native Javascript `BigInt` arrays and primitive permutations) is structurally identical via `XRON.parse(XRON.stringify(data))` assertion logic.
 - **Tested as a property, not as examples:** the round-trip identity runs over a
   boundary-focused corpus at every level (1, 2, 3 and `auto`) as part of a
-  591-test suite, alongside randomised fuzzing. Current measured failure rate:
-  **0 in 114,000** randomised round-trips across 19 seeds, down from 2,673 in
+  759-test suite, alongside randomised fuzzing. Current measured failure rate:
+  **0 in 36,000** randomised round-trips against our own generator; see the verification record for independent results, down from 2,673 in
   4,800 (55.7%) in 0.3.0.
 - **Generative CI Testing:** XRON's CI/CD pipeline uses property-based generative testing (using randomly nested payloads of variable keys, `Date`, `BigInt`, floats, and Unicode strings) to simulate intense chaos. Hundreds of randomised edge cases are automatically compressed and decompressed on every commit to mathematically isolate and guarantee zero hallucination drops.
 
 - **Native BigInt Support:** XRON dynamically manages integer precision via Level 3 BigInt Delta calculation heuristics out-of-the-box. Sequential `BigInt` columns (e.g. `9999999999999999999n`) compress smoothly (`+1`) without Javascript math degradation.
 
 > **Full evidence:** [docs/VERIFICATION.md](docs/VERIFICATION.md) records every
-> test, the twenty-one corruption bugs found and fixed in 0.4.0, the fix-by-fix
+> test, the thirty-three corruption bugs found and fixed in 0.4.0, the fix-by-fix
 > failure rates, and what a zero failure rate does and does not establish —
 > with commands to reproduce every figure.
 

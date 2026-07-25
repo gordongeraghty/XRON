@@ -13,7 +13,15 @@
 // state machine in splitRow/splitKeyValue — desynchronising every field after
 // it in the row, which is where the "reading 'startsWith' of undefined" crash
 // came from.
-const NEEDS_QUOTING_REGEX = /[,\n\r\t"]|^\s|\s$|^[@$%+*~\-\[{]/;
+// '^' joins the leading-sigil set because Level 3 writes compacted UUIDs as
+// ^<base62>, and decodeTypedValue treats any unquoted leading '^' as one —
+// so "^abc" decoded to a UUID, and "^!!!" threw on an invalid base62 char.
+const NEEDS_QUOTING_REGEX = /[,\n\r\t"]|^\s|\s$|^[@$%+*~\-\[{^]/;
+// A string that already looks like XRON's own compact-date output. The
+// compaction trigger requires dashes, so this shape is never produced from
+// such a value — but the decoder expands it regardless, turning the literal
+// "20240615T102030Z" into "2024-06-15T10:20:30Z".
+const LOOKS_LIKE_COMPACT_DATE = /^\d{8}T/;
 const LOOKS_LIKE_NUMBER = /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i;
 // A string like "5n" would otherwise be read back as the BigInt 5n.
 const LOOKS_LIKE_BIGINT = /^-?\d+n$/;
@@ -22,11 +30,39 @@ const RESERVED_WORDS = new Set(['true', 'false', 'null', '-', '1', '0']);
 /**
  * Determine if a string value needs quoting in XRON output.
  */
+/**
+ * Do this string's brackets open and close cleanly, never going negative?
+ *
+ * splitRow and splitTopLevel track ( [ { and ) ] } as nesting depth to find
+ * field boundaries. A *balanced* run is harmless — depth returns to zero and
+ * any separator inside is correctly treated as part of the value. An
+ * unbalanced one is not: a lone "]" drove the depth negative and the splitter
+ * stopped recognising separators, so `{ baz: 'p]', other: 1 }` decoded as
+ * `{ baz: "p], other: 1" }` with the second field swallowed.
+ *
+ * Only unbalanced strings are quoted, so ordinary prose like "Hello (world)"
+ * still costs nothing.
+ */
+function hasUnbalancedDelimiters(value: string): boolean {
+  let depth = 0;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
+      if (depth < 0) return true;
+    }
+  }
+  return depth !== 0;
+}
+
 export function needsQuoting(value: string): boolean {
   if (value === '') return true;
   if (NEEDS_QUOTING_REGEX.test(value)) return true;
+  if (hasUnbalancedDelimiters(value)) return true;
   if (LOOKS_LIKE_NUMBER.test(value)) return true;
   if (LOOKS_LIKE_BIGINT.test(value)) return true;
+  if (LOOKS_LIKE_COMPACT_DATE.test(value)) return true;
   if (RESERVED_WORDS.has(value)) return true;
   // Check if it looks like a schema reference: Name(...)
   if (/^[A-Z][A-Za-z0-9]*\(/.test(value)) return true;

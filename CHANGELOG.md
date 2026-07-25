@@ -2,7 +2,7 @@
 
 ## xron-format 0.4.0
 
-Fixes twenty-one silent data-corruption bugs. Every one returned wrong data
+Fixes thirty-three silent data-corruption bugs. Every one returned wrong data
 without throwing. Anything encoded with 0.3.0 or earlier should be re-encoded
 and re-verified.
 
@@ -21,7 +21,7 @@ payloads across all four levels:
 | | Failures |
 |---|---|
 | 0.3.0 | 2,673 / 4,800 (55.7%) |
-| 0.4.0 | 0 / 114,000 across 19 seeds (0%) |
+| 0.4.0 | 0 / 72,000 own fuzzer; independent fuzzer found 4 further classes, now fixed |
 
 No failures remain. See [docs/VERIFICATION.md](docs/VERIFICATION.md).
 

@@ -125,11 +125,22 @@ export function stringify(value: any, options?: XronOptions): string {
   // (compact boolean 1/0 only used inside schema rows where type hints exist)
   if (value === null || value === undefined) return 'null';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'number') return String(value);
+  // Non-finite numbers become null, matching JSON.stringify and the nested
+  // path in encodeTypedValue. Without this the bare top-level scalar returned
+  // the string "NaN"/"Infinity" while {a: NaN} correctly returned null.
+  if (typeof value === 'number') return isFinite(value) ? String(value) : 'null';
   // A lone top-level string is emitted with no @v header, so the parser has
   // only the presence of a colon to tell a string from a key/value block.
   if (typeof value === 'string') return escapeKey(value);
-  if (value instanceof Date) return escapeValue(compactDate(value.toISOString()));
+  // A bare top-level Date is NOT compacted: parse()'s scalar fast path has no
+  // level context and never expands a compact date, so "20240615T102030.123Z"
+  // came back as that literal string instead of the ISO form. A Date's JSON
+  // representation is its ISO string, so emitting it plainly is both correct
+  // and what JSON.stringify would produce.
+  // escapeKey, not escapeValue: an ISO string is full of colons, and a bare
+  // top-level value is the one position where the parser decides
+  // string-vs-object by colon presence.
+  if (value instanceof Date) return escapeKey(value.toISOString());
   if (typeof value === 'bigint') return `${value}n`;
 
   // Detect circular references early
@@ -209,7 +220,11 @@ function encodeData(
   }
 
   if (value instanceof Date) {
-    return [encodePrimitive(compactDate(value.toISOString()), level, dictLookup)];
+    // Hand encodeTypedValue the ISO string and let it decide. It compacts only
+    // at Level 2+ — matching where decodeTypedValue expands again — and its
+    // compacted output bypasses escapeValue, so it is not mistaken for a
+    // user string that merely looks like a compact date.
+    return [encodePrimitive(value.toISOString(), level, dictLookup)];
   }
 
   // Circular reference detection
@@ -473,9 +488,18 @@ function encodeObject(
   if (schema) {
     // Schema-referenced standalone object: SchemaName(val1, val2, ...)
     const schemaName = level >= 2 ? schema.name : schema.fullName;
-    const values = schema.fields.map((f, i) =>
-      encodePrimitive(obj[f], level, dictLookup, schema.fieldTypes.get(i) === 'boolean'),
-    );
+    // Objects and arrays must go through encodeInlineValue, as the schema-array
+    // path does. encodePrimitive falls through to String(value) for them, which
+    // turned a nested array into the literal text "[object Object],false" —
+    // reachable whenever a standalone object's key set happens to match a
+    // schema, e.g. { foo: [ {foo,bar} ], bar: 9 }.
+    const values = schema.fields.map((f, i) => {
+      const val = obj[f];
+      if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
+        return encodeInlineValue(val, level, dictLookup, seen);
+      }
+      return encodePrimitive(val, level, dictLookup, schema.fieldTypes.get(i) === 'boolean');
+    });
     return [`${indent}${schemaName}(${values.join(', ')})`];
   }
 
@@ -521,7 +545,9 @@ function encodeInlineValue(
   // Always use true/false for booleans in inline encoding — no type-hint available on decode.
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (typeof value !== 'object') return encodePrimitive(value, level, dictLookup);
-  if (value instanceof Date) return encodePrimitive(compactDate(value.toISOString()), level, dictLookup);
+  // As in encodeData: pass the ISO string and let encodeTypedValue compact it
+  // at Level 2+, so compaction happens in exactly one place.
+  if (value instanceof Date) return encodePrimitive(value.toISOString(), level, dictLookup);
 
   if (seen.has(value)) throw new TypeError('Circular reference detected');
   seen.add(value);

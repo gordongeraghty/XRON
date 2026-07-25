@@ -47,11 +47,25 @@ export function extractSchemas(data: any): Map<string, SchemaDefinition> {
   const nameGen = new ClassNameGenerator();
   const schemas = new Map<string, SchemaDefinition>();
 
+  // Level 1 emits fullName as the schema's on-the-wire name, and the parser
+  // keys schemas by that name last-write-wins. guessFullName is a heuristic
+  // with a generic fallback, so two unrelated shapes could collide on e.g.
+  // "Item" — the later header then silently replaced the schema the data rows
+  // relied on, relabelling every row with the wrong field names. Names are
+  // made unique here so the wire form is unambiguous.
+  const usedFullNames = new Set<string>();
   for (const [sig, info] of sorted) {
     const name = nameGen.next();
+    let fullName = guessFullName(info.samplePath, info.keys);
+    if (usedFullNames.has(fullName)) {
+      let n = 2;
+      while (usedFullNames.has(`${fullName}${n}`)) n++;
+      fullName = `${fullName}${n}`;
+    }
+    usedFullNames.add(fullName);
     schemas.set(sig, {
       name,
-      fullName: guessFullName(info.samplePath, info.keys),
+      fullName,
       fields: info.keys,
       signature: sig,
       frequency: info.frequency,
@@ -94,12 +108,13 @@ function collectShapes(
 
   const keys = Object.keys(value);
   if (keys.length >= 2) {
-    // .slice() is required, not incidental: sort() mutates in place, and `keys`
-    // is stored below as the schema's field order. Sorting it directly
-    // alphabetises every object's fields on decode — {n, code} came back as
-    // {code, n} — which breaks the round-trip identity even though the values
-    // are intact.
-    const signature = keys.slice().sort().join(',');
+    // The signature is deliberately ORDER-SENSITIVE — no sort. Two objects with
+    // the same key set but different insertion order are different shapes, and
+    // must not share a schema: the schema carries one field order, so the second
+    // object would be re-emitted in the first one's order. {a,b} then {b,a} came
+    // back as {a,b} twice. Sorting here also mutated `keys` in place, which is
+    // stored just below as the field order.
+    const signature = keys.join(',');
     const existing = shapes.get(signature);
     if (existing) {
       existing.frequency++;
@@ -236,7 +251,7 @@ function resolveNestedSchemas(
         if (fieldValue !== null && typeof fieldValue === 'object' && !Array.isArray(fieldValue)) {
           const nestedKeys = Object.keys(fieldValue);
           if (nestedKeys.length >= 1) {
-            const nestedSig = nestedKeys.sort().join(',');
+            const nestedSig = nestedKeys.join(',');
             const nestedSchemaName = sigToSchema.get(nestedSig);
             if (nestedSchemaName) {
               if (matchedSchema === null) {
@@ -290,7 +305,7 @@ function collectInstances(value: any, signature: string, results: any[]): void {
     if (keys.length >= 1) {
       // Copy before sorting: `keys` drives the traversal below, and reordering
       // it changes the order instances are collected in — i.e. the row order.
-      const sig = keys.slice().sort().join(',');
+      const sig = keys.join(',');
       if (sig === signature) {
         results.push(value);
       }
@@ -311,6 +326,6 @@ export function matchSchema(
 ): SchemaDefinition | null {
   const keys = Object.keys(obj);
   if (keys.length < 1) return null;
-  const signature = keys.sort().join(',');
+  const signature = keys.join(',');
   return schemas.get(signature) ?? null;
 }
