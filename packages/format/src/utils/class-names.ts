@@ -15,19 +15,10 @@ export function generateClassName(index: number): string {
 
 export class ClassNameGenerator {
   private index = 0;
-  private usedNames = new Set<string>();
 
+  // generateClassName is injective over an increasing index (A..Z, then
+  // A0..Z0, A1..Z1, ...), so names cannot repeat and no dedup set is needed.
   next(): string {
-    let name: string;
-    do {
-      name = generateClassName(this.index++);
-    } while (this.usedNames.has(name));
-    this.usedNames.add(name);
-    return name;
-  }
-
-  reset(): void {
-    this.index = 0;
-    this.usedNames.clear();
+    return generateClassName(this.index++);
   }
 }

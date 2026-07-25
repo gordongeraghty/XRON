@@ -10,6 +10,9 @@ interface FormatPanelProps {
   isBaseline: boolean
   highlightTokens: boolean
   error?: string
+  /** Decoding this panel's own output did not reproduce the input. */
+  roundTripError?: string
+  labelOverride?: string
 }
 
 const NUM_COLORS = 8
@@ -81,6 +84,8 @@ export default function FormatPanel({
   isBaseline,
   highlightTokens,
   error,
+  roundTripError,
+  labelOverride,
 }: FormatPanelProps) {
   const [copied, setCopied] = useState(false)
 
@@ -105,7 +110,7 @@ export default function FormatPanel({
       <div className="px-4 pt-4 pb-2 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-0.5">
-            {FORMAT_LABELS[formatId]}
+            {labelOverride ?? FORMAT_LABELS[formatId]}
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
             {tokenCount.toLocaleString()}
@@ -146,7 +151,17 @@ export default function FormatPanel({
             Error: {error}
           </div>
         ) : (
-          <div>{lines}</div>
+          <>
+            {/* Shown above the output, not instead of it: the encoded form is
+                still worth reading when the decode disagrees with it. */}
+            {roundTripError && (
+              <div className="mb-2 text-xs p-2 rounded border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-sans">
+                <span className="font-semibold">Not lossless: </span>
+                {roundTripError}
+              </div>
+            )}
+            <div>{lines}</div>
+          </>
         )}
       </div>
     </div>

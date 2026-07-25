@@ -1,0 +1,32 @@
+<!-- Placeholder: XRON Format Comparison Chart -->
+<!-- Replace with final graphic using XRON Orange (#ff6600) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+  <rect width="800" height="400" fill="#1a1a2e" rx="12"/>
+  <text x="400" y="40" text-anchor="middle" fill="#ff6600" font-family="General Sans, sans-serif" font-size="24" font-weight="bold">XRON Format Comparison</text>
+  <text x="400" y="70" text-anchor="middle" fill="#999" font-family="General Sans, sans-serif" font-size="14">100-row dataset, 7 fields — token count by format</text>
+
+  <!-- Bars -->
+  <rect x="80" y="100" width="600" height="32" fill="#333" rx="4"/>
+  <text x="70" y="121" text-anchor="end" fill="#ccc" font-family="monospace" font-size="13">JSON</text>
+  <text x="690" y="121" fill="#999" font-family="monospace" font-size="12">5,681 tokens</text>
+
+  <rect x="80" y="150" width="570" height="32" fill="#444" rx="4"/>
+  <text x="70" y="171" text-anchor="end" fill="#ccc" font-family="monospace" font-size="13">YAML</text>
+  <text x="660" y="171" fill="#999" font-family="monospace" font-size="12">5,623 tokens</text>
+
+  <rect x="80" y="200" width="312" height="32" fill="#555" rx="4"/>
+  <text x="70" y="221" text-anchor="end" fill="#ccc" font-family="monospace" font-size="13">TOON</text>
+  <text x="400" y="221" fill="#999" font-family="monospace" font-size="12">2,953 tokens</text>
+
+  <rect x="80" y="250" width="244" height="32" fill="#ff6600" rx="4" opacity="0.7"/>
+  <text x="70" y="271" text-anchor="end" fill="#ff6600" font-family="monospace" font-size="13">XRON L1</text>
+  <text x="334" y="271" fill="#ff6600" font-family="monospace" font-size="12">2,311 tokens</text>
+
+  <rect x="80" y="300" width="204" height="32" fill="#ff6600" rx="4" opacity="0.85"/>
+  <text x="70" y="321" text-anchor="end" fill="#ff6600" font-family="monospace" font-size="13">XRON L2</text>
+  <text x="294" y="321" fill="#ff6600" font-family="monospace" font-size="12">1,928 tokens</text>
+
+  <rect x="80" y="350" width="174" height="32" fill="#ff6600" rx="4"/>
+  <text x="70" y="371" text-anchor="end" fill="#ff6600" font-family="monospace" font-size="13">XRON L3</text>
+  <text x="264" y="371" fill="#ff6600" font-family="monospace" font-size="12">1,646 tokens (−71%)</text>
+</svg>

@@ -1,6 +1,6 @@
 {
   "name": "xron-mcp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "bin": {
     "xron-mcp": "./dist/index.js"
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "xron-format": "*",
+    "xron-format": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {

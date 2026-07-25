@@ -134,9 +134,13 @@ describe('XRON Round-Trip: Lossless Guarantee', () => {
       expect(() => XRON.stringify(obj)).toThrow('Circular reference');
     });
 
+    // Changed deliberately: asserting '42' pinned a lossy encoding, since
+    // parsing '42' yields the number 42, not BigInt(42). Now asserted as an
+    // actual round-trip, which is what this suite is for.
     it('handles BigInt values', () => {
       const result = XRON.stringify(BigInt(42));
-      expect(result).toBe('42');
+      expect(result).toBe('42n');
+      expect(XRON.parse(result)).toBe(BigInt(42));
     });
   });
 

@@ -59,7 +59,28 @@ export function detectColumnTemplates(
     const totalSavings = savedPerRow * cells.length - headerCost;
 
     if (savedPerRow >= minSavingsPerRow && totalSavings > 0) {
-      templates.push({ columnIndex: col, prefix, suffix });
+      // Stripping a prefix/suffix can remove an opening delimiter and leave the
+      // cell's own separator exposed at depth 0 — e.g. "B(city0, c0)" with
+      // prefix "B(city" and suffix ")" leaves "0, c0", so the row re-splits into
+      // too many fields and every later column reads the wrong cell.
+      const unsafe = values.some(v => {
+        const endIdx = suffix.length > 0 ? v.length - suffix.length : v.length;
+        const residual = v.slice(prefix.length, endIdx);
+        // splitRow trims every cell, so a residual that starts or ends with
+        // whitespace loses it and the value re-expands wrong: prefix
+        // "has space" over "has space 17" leaves " 17", trimmed to "17".
+        if (residual !== residual.trim()) return true;
+        // An empty residual in the first or last column puts the field
+        // separator at the very edge of the line, and the decoder collects
+        // rows with line.trim() — which eats it. The row then splits into one
+        // cell instead of two and every column after it reads the wrong value.
+        // An interior empty cell is flanked by separators, so it is safe.
+        if (residual === '' && (col === 0 || col === numCols - 1)) return true;
+        return hasUnsafeDelimiterAtDepthZero(residual);
+      });
+      if (!unsafe) {
+        templates.push({ columnIndex: col, prefix, suffix });
+      }
     }
   }
 
@@ -121,6 +142,34 @@ export function expandColumnTemplates(
     result[i] = newRow;
   }
   return result;
+}
+
+/**
+ * Would this residual cell text expose a row separator at nesting depth 0?
+ * Mirrors splitRow's quote/bracket tracking, so the answer matches how the
+ * decoder will actually split the row. Both ',' and '\t' are checked
+ * regardless of level: over-inclusive only ever skips a template that was
+ * already unsafe, never misses one.
+ */
+function hasUnsafeDelimiterAtDepthZero(s: string): boolean {
+  let inQuotes = false;
+  let depth = 0;
+  let isEscaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '\\' && !isEscaped) { isEscaped = true; continue; }
+    if (ch === '"' && !isEscaped) {
+      inQuotes = !inQuotes;
+    } else if (!inQuotes && (ch === '(' || ch === '[' || ch === '{')) {
+      depth++;
+    } else if (!inQuotes && (ch === ')' || ch === ']' || ch === '}')) {
+      depth--;
+    } else if (!inQuotes && depth === 0 && (ch === ',' || ch === '\t')) {
+      return true;
+    }
+    isEscaped = false;
+  }
+  return false;
 }
 
 /** Find the longest common prefix of an array of strings */

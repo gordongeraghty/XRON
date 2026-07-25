@@ -48,7 +48,7 @@ export default function Header({ darkMode, onToggleDark }: HeaderProps) {
 
           {/* GitHub */}
           <a
-            href="https://github.com/gordoly/xron"
+            href="https://github.com/gordongeraghty/XRON"
             target="_blank"
             rel="noopener noreferrer"
             className="ml-1 p-2 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"

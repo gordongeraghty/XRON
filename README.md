@@ -59,7 +59,26 @@ XRON is a lossless serialisation format purpose-built for LLM token efficiency. 
 | L8 | Separator reduction | Field separator overhead (tab vs comma-space) |
 | L9 | Tokeniser alignment | Suboptimal BPE token boundaries |
 
-The result: `XRON.parse(XRON.stringify(data))` deep-equals the original data, while using 60--80% fewer tokens.
+The result: `XRON.parse(XRON.stringify(data))` deep-equals the original data.
+
+**Token reduction depends on the shape of your data**, because XRON deletes
+repeated keys and repeated values — so the ratio measures how much of your
+payload was structure rather than information. Measured with the real
+`o200k_base` tokenizer:
+
+| Your data looks like | Token reduction |
+|---|---:|
+| Identical repeated rows, long string values | **up to 91%** |
+| Wide tables, small vocabulary (30 cols) | **~80%** |
+| Long column names, small values (20 cols) | **~79%** |
+| Boolean/flag matrices (20 cols) | **~71%** |
+| Typical business records (6 fields) | **~48%** |
+| Unique UUIDs or unique prose | **~21%** |
+
+A wide table of categorical values is mostly structure, so it reaches 80%. A
+narrow table of unique emails is mostly information, and information cannot be
+deleted losslessly. See [BENCHMARKS.md](BENCHMARKS.md) for the full figures and
+the floor analysis.
 
 ---
 
@@ -81,8 +100,19 @@ Because XRON targets LLMs, a common concern is the "hallucination" of data durin
 **XRON is an algorithmic encoder, not an LLM summariser.** It never drops, hallucinates, or estimates data.
 
 - **Strictly Lossless:** The exact data type topology (including native Javascript `BigInt` arrays and primitive permutations) is structurally identical via `XRON.parse(XRON.stringify(data))` assertion logic.
+- **Tested as a property, not as examples:** the round-trip identity runs over a
+  boundary-focused corpus at every level (1, 2, 3 and `auto`) as part of a
+  591-test suite, alongside randomised fuzzing. Current measured failure rate:
+  **0 in 114,000** randomised round-trips across 19 seeds, down from 2,673 in
+  4,800 (55.7%) in 0.3.0.
 - **Generative CI Testing:** XRON's CI/CD pipeline uses property-based generative testing (using randomly nested payloads of variable keys, `Date`, `BigInt`, floats, and Unicode strings) to simulate intense chaos. Hundreds of randomised edge cases are automatically compressed and decompressed on every commit to mathematically isolate and guarantee zero hallucination drops.
+
 - **Native BigInt Support:** XRON dynamically manages integer precision via Level 3 BigInt Delta calculation heuristics out-of-the-box. Sequential `BigInt` columns (e.g. `9999999999999999999n`) compress smoothly (`+1`) without Javascript math degradation.
+
+> **Full evidence:** [docs/VERIFICATION.md](docs/VERIFICATION.md) records every
+> test, the twenty-one corruption bugs found and fixed in 0.4.0, the fix-by-fix
+> failure rates, and what a zero failure rate does and does not establish —
+> with commands to reproduce every figure.
 
 ---
 
@@ -559,6 +589,11 @@ When an object field consistently contains objects matching another schema, nest
 ---
 
 ## Benchmarks & Format Comparison
+
+> The tables in this section compare **character counts**. Character reduction
+> and token reduction are not the same number — see
+> [BENCHMARKS.md](BENCHMARKS.md) for token figures measured with `o200k_base`,
+> which are lower.
 
 ### Side-by-Side: 10-Row Employee Table
 

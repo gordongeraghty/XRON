@@ -249,7 +249,7 @@ export function parseChecksumHeader(line: string): string | null {
  */
 export function getHeaderType(
   line: string,
-): 'version' | 'schema' | 'dict' | 'cardinality' | 'template' | 'substring-dict' | 'checksum' | 'anonymous-array' | 'unknown' {
+): 'version' | 'schema' | 'dict' | 'cardinality' | 'template' | 'substring-dict' | 'checksum' | 'anonymous-array' | 'delta-columns' | 'unknown' {
   if (line.startsWith('@v')) return 'version';
   if (line.startsWith('@C')) return 'checksum';
   if (line.startsWith('@S')) return 'schema';
@@ -257,8 +257,37 @@ export function getHeaderType(
   if (line.startsWith('@P')) return 'substring-dict';
   if (line.startsWith('@T')) return 'template';
   if (line.startsWith('@A')) return 'anonymous-array';
+  if (line.startsWith('@X')) return 'delta-columns';
   if (line.startsWith('@N')) return 'cardinality';
   return 'unknown';
+}
+
+/**
+ * Format a delta-columns header line.
+ *   @X: 0, 2   columns 0 and 2 are delta-encoded in the block that follows
+ *   @X:        explicitly no delta columns
+ *
+ * The encoder already knows which columns it delta-encoded; recording that
+ * removes the decoder's need to infer it from cell text. Inference cannot
+ * distinguish a delta from a literal negative number, so a plain -5 sitting in
+ * a column the encoder left alone was being accumulated onto the previous row.
+ * Emitting the empty form matters: it separates "this encoder decided none"
+ * from "this document predates the header".
+ */
+export function formatDeltaColumnsHeader(columnIndices: number[]): string {
+  return columnIndices.length > 0 ? `@X: ${columnIndices.join(', ')}` : '@X:';
+}
+
+/** Parse a delta-columns header: "@X: 0, 2" → [0, 2], "@X:" → [] */
+export function parseDeltaColumnsHeader(line: string): number[] | null {
+  const match = line.match(/^@X\s*:\s*(.*)$/);
+  if (!match) return null;
+  const inner = match[1].trim();
+  if (inner === '') return [];
+  return inner
+    .split(',')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(n => Number.isFinite(n));
 }
 
 /**

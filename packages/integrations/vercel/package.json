@@ -1,0 +1,28 @@
+{
+  "name": "xron-vercel",
+  "version": "0.1.0",
+  "description": "XRON integration for Vercel AI SDK — compress data in LLM messages",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "ai": ">=3.0.0"
+  },
+  "dependencies": {
+    "xron-format": "*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "vitest": "^1.0.0",
+    "typescript": "^5.0.0"
+  },
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

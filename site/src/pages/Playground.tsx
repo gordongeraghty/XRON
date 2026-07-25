@@ -1,13 +1,21 @@
-import { useState, useMemo, useCallback } from 'react'
-import { XRON } from '@xron/index'
+import { useState, useMemo, useCallback, useRef } from 'react'
+import { XRON } from 'xron-format'
 import { PRESETS } from '../data/presets'
 import DatasetSelector from '../components/DatasetSelector'
 import FormatPanel from '../components/FormatPanel'
 import TokenBar from '../components/TokenBar'
-import { ALL_FORMATS, FORMAT_LABELS, FormatId, formatData } from '../utils/formatters'
+import { ALL_FORMATS, FORMAT_LABELS, FormatId, formatData, verifyRoundTrip } from '../utils/formatters'
 import { countTokens } from '../utils/tokenizer'
 
 type TabId = 'presets' | 'custom'
+
+type FormatResult = {
+  content: string
+  tokens: number
+  error?: string
+  /** Set when decoding this format's own output failed to reproduce the input. */
+  roundTrip?: string
+}
 
 const DEFAULT_ACTIVE: FormatId[] = ['json', 'toon', 'tron', 'xron-2', 'xron-3', 'xron-auto']
 
@@ -44,12 +52,18 @@ export default function Playground() {
   }, [])
 
   const formatResults = useMemo(() => {
-    if (!data) return {} as Record<FormatId, { content: string; tokens: number; error?: string }>
-    const results: Partial<Record<FormatId, { content: string; tokens: number; error?: string }>> = {}
+    if (!data) return {} as Record<FormatId, FormatResult>
+    const results: Partial<Record<FormatId, FormatResult>> = {}
     for (const fmt of ALL_FORMATS) {
       try {
         const content = formatData(data, fmt)
-        results[fmt] = { content, tokens: countTokens(content) }
+        // Encode then decode: a format that claims losslessness has to prove it
+        // here, on the page people use to evaluate it.
+        results[fmt] = {
+          content,
+          tokens: countTokens(content),
+          roundTrip: verifyRoundTrip(data, fmt, content) ?? undefined,
+        }
       } catch (e: unknown) {
         results[fmt] = {
           content: '',
@@ -58,7 +72,7 @@ export default function Playground() {
         }
       }
     }
-    return results as Record<FormatId, { content: string; tokens: number; error?: string }>
+    return results as Record<FormatId, FormatResult>
   }, [data])
 
   const tokenCounts = useMemo(() => {
@@ -86,7 +100,17 @@ export default function Playground() {
     }
   }, [data])
 
+  // Detect whether auto mode fell back to raw JSON (Never-Worse Guarantee)
+  const autoUsedJson = useMemo(() => {
+    const autoContent = formatResults['xron-auto']?.content ?? ''
+    const jsonContent = formatResults['json']?.content ?? ''
+    return autoContent.length > 0 && autoContent === jsonContent
+  }, [formatResults])
+
   const [showCaveats, setShowCaveats] = useState(false)
+  const [showWhySmaller, setShowWhySmaller] = useState(false)
+  const [copiedXron, setCopiedXron] = useState(false)
+  const [sharedStats, setSharedStats] = useState(false)
 
   const baselineTokens = tokenCounts[baseline] ?? 0
 
@@ -94,6 +118,27 @@ export default function Playground() {
     setActiveFormats(prev =>
       prev.includes(fmt) ? prev.filter(f => f !== fmt) : [...prev, fmt]
     )
+  }
+
+  const handleCopyXron = () => {
+    const xronContent = formatResults['xron-auto']?.content ?? formatResults['xron-3']?.content ?? ''
+    if (!xronContent) return
+    navigator.clipboard.writeText(xronContent).then(() => {
+      setCopiedXron(true)
+      setTimeout(() => setCopiedXron(false), 1500)
+    })
+  }
+
+  const handleShareStats = () => {
+    const jsonTokens = tokenCounts['json'] ?? 0
+    const xronTokens = tokenCounts['xron-auto'] ?? tokenCounts['xron-3'] ?? 0
+    if (jsonTokens === 0) return
+    const pct = Math.round(((jsonTokens - xronTokens) / jsonTokens) * 100)
+    const text = `I compressed my JSON by ${pct}% using XRON! https://github.com/gordongeraghty/XRON`
+    navigator.clipboard.writeText(text).then(() => {
+      setSharedStats(true)
+      setTimeout(() => setSharedStats(false), 2000)
+    })
   }
 
   return (
@@ -169,9 +214,18 @@ export default function Playground() {
             <span className="text-lg leading-none select-none">💡</span>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-indigo-800 dark:text-indigo-200 mb-0.5">
-                Recommendation: Level {recommendation.recommendedLevel}
-                {!recommendation.willCompress && (
-                  <span className="ml-2 text-xs font-normal text-indigo-500 dark:text-indigo-400">(compression skipped — payload too small)</span>
+                {autoUsedJson ? (
+                  <>
+                    Recommendation: Raw JSON
+                    <span className="ml-2 text-xs font-normal text-[#ff6600]">(Auto-mode selected raw JSON — payload too small for XRON compression overhead)</span>
+                  </>
+                ) : (
+                  <>
+                    Recommendation: Level {recommendation.recommendedLevel}
+                    {!recommendation.willCompress && (
+                      <span className="ml-2 text-xs font-normal text-indigo-500 dark:text-indigo-400">(compression skipped — payload too small)</span>
+                    )}
+                  </>
                 )}
               </p>
               <p className="text-indigo-700 dark:text-indigo-300 mb-1">{recommendation.reason}</p>
@@ -204,6 +258,21 @@ export default function Playground() {
                   )}
                 </div>
               )}
+              <div className="mt-2">
+                <button
+                  onClick={() => setShowWhySmaller(v => !v)}
+                  className="text-xs text-[#ff6600] hover:text-[#cc5200] underline underline-offset-2 transition-colors"
+                >
+                  {showWhySmaller ? 'Hide explanation' : 'Why is this smaller?'}
+                </button>
+                {showWhySmaller && (
+                  <div className="mt-1.5 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 rounded-lg p-3 space-y-1">
+                    <p><strong>XRON</strong> is strictly lossless — it preserves exact data types (BigInt, Date, null) through round-trip serialisation. This requires schema headers (@S, @D, @N) that add overhead on small payloads.</p>
+                    <p><strong>TOON/TRON</strong> use lighter notation but lack dictionary encoding, delta compression, and type-aware encoding — so they fall behind on larger datasets.</p>
+                    <p><strong>Auto mode</strong> guarantees "never worse than JSON": if no XRON level beats raw JSON, it returns JSON directly.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -279,8 +348,34 @@ export default function Playground() {
               isBaseline={fmt === baseline}
               highlightTokens={highlightTokens}
               error={formatResults[fmt]?.error}
+              roundTripError={formatResults[fmt]?.roundTrip}
+              labelOverride={fmt === 'xron-auto' && autoUsedJson ? 'XRON Auto (JSON Fallback)' : undefined}
             />
           ))}
+        </div>
+      )}
+
+      {/* XRON action buttons */}
+      {activeFormats.length > 0 && data && (
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={handleCopyXron}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            {copiedXron ? 'Copied!' : 'Copy XRON'}
+          </button>
+          <button
+            onClick={handleShareStats}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-[#ff6600] hover:text-[#ff6600] transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            {sharedStats ? 'Copied to clipboard!' : 'Share Stats'}
+          </button>
         </div>
       )}
 

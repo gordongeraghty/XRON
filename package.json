@@ -2,10 +2,12 @@
   "name": "xron-workspace",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "packages/integrations/*"
   ],
   "scripts": {
     "test": "vitest run --dir packages",
     "build": "npm run build --workspaces"
-  }
+  },
+  "version": "0.0.1"
 }

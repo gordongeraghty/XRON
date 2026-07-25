@@ -21,6 +21,7 @@ import {
   parseTemplateHeader,
   parseSubstringDictHeader,
   parseChecksumHeader,
+  parseDeltaColumnsHeader,
   isHeaderLine,
   getHeaderType,
 } from './format/header.js';
@@ -46,7 +47,14 @@ export function parse(input: string, options?: XronOptions): unknown {
   let currentDepth = 0;
   for (let i = 0; i < input.length; i++) {
     const ch = input[i];
-    if (ch === '{' || ch === '[' || ch === '(') {
+    // Reset per line. Real nesting never spans lines in emitted XRON (strings
+    // escape their newlines, and every bracket pair opens and closes on one
+    // line), so a counter running across the whole document just accumulates
+    // drift from delimiters swallowed into dictionary values — which reported
+    // "Maximum parsing depth exceeded" on documents that parse perfectly well.
+    if (ch === '\n') {
+      currentDepth = 0;
+    } else if (ch === '{' || ch === '[' || ch === '(') {
       currentDepth++;
       if (currentDepth > opts.maxDepth) throw new TypeError('Maximum parsing depth exceeded');
     } else if (ch === '}' || ch === ']' || ch === ')') {
@@ -61,10 +69,8 @@ export function parse(input: string, options?: XronOptions): unknown {
   if (trimmed === 'null' || trimmed === '-') return null;
   if (trimmed === 'true') return true;
   if (trimmed === 'false') return false;
+  if (/^-?\d+n$/.test(trimmed)) return BigInt(trimmed.slice(0, -1));
   if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(trimmed)) {
-    if (!trimmed.includes('.') && (trimmed.length > 15 || !Number.isSafeInteger(Number(trimmed)))) {
-      return BigInt(trimmed);
-    }
     return Number(trimmed);
   }
 
@@ -103,8 +109,13 @@ export function parse(input: string, options?: XronOptions): unknown {
     return parseKeyValueBlock(trimmed, 1, [], new Map());
   }
 
-  // Parse the XRON document
-  const doc = parseDocument(trimmed, opts.strictValidation);
+  // Parse the XRON document.
+  // Deliberately `input`, not `trimmed`: the checksum was computed by the
+  // encoder over the untrimmed payload, so trimming here made verification
+  // hash a different string and report a spurious mismatch whenever the
+  // document legitimately ended in a meaningful field separator (an empty
+  // trailing cell). parseDocument skips blank lines itself.
+  const doc = parseDocument(input, opts.strictValidation);
   return doc.data;
 }
 
@@ -132,6 +143,9 @@ function parseDocument(input: string, strict = false): XronDocument {
   let dictionary: string[] = [];
   let substringDict: string[] = [];
   const columnTemplates: ColumnTemplate[] = [];
+  // null means "no @X header present" — a document from before this header
+  // existed, where the decoder must fall back to inferring delta columns.
+  let deltaColumnHeader: number[] | null = null;
 
   while (lineIdx < lines.length) {
     const line = lines[lineIdx].trim();
@@ -210,6 +224,12 @@ function parseDocument(input: string, strict = false): XronDocument {
         lineIdx++;
         break;
       }
+      case 'delta-columns': {
+        const cols = parseDeltaColumnsHeader(line);
+        if (cols !== null) deltaColumnHeader = cols;
+        lineIdx++;
+        break;
+      }
       case 'cardinality': {
         // Don't consume — cardinality headers are part of data
         break;
@@ -228,7 +248,7 @@ function parseDocument(input: string, strict = false): XronDocument {
 
   // Phase 2: Parse data section
   const remainingLines = lines.slice(lineIdx);
-  const data = parseDataSection(remainingLines, version, schemas, schemasByName, dictionary, columnTemplates, substringDict, strict);
+  const data = parseDataSection(remainingLines, version, schemas, schemasByName, dictionary, columnTemplates, substringDict, strict, deltaColumnHeader);
 
   return { version, schemas, dictionary, data };
 }
@@ -245,6 +265,7 @@ function parseDataSection(
   columnTemplates: ColumnTemplate[] = [],
   substringDict: string[] = [],
   strict = false,
+  deltaColumnHeader: number[] | null = null,
 ): unknown {
   if (lines.length === 0) return null;
 
@@ -331,7 +352,7 @@ function parseDataSection(
     }
 
     // Decode rows
-    return decodeSchemaRows(dataRows, schema, version, schemas, schemasByName, dictionary, columnTemplates, substringDict);
+    return decodeSchemaRows(dataRows, schema, version, schemas, schemasByName, dictionary, columnTemplates, substringDict, deltaColumnHeader);
   }
 
   // Check for empty array/object
@@ -382,6 +403,7 @@ function decodeSchemaRows(
   dictionary: string[],
   columnTemplates: ColumnTemplate[] = [],
   substringDict: string[] = [],
+  deltaColumnHeader: number[] | null = null,
 ): unknown[] {
   // Split each row into cells
   // Optimization (Bolt): Using pre-allocated arrays and imperative for-loops
@@ -410,19 +432,31 @@ function decodeSchemaRows(
   if (version >= 3) {
     cells = decodeRepeatRows(cells);
 
-    // Detect delta columns (columns where values start with +/-)
     const deltaColumns = new Set<number>();
     const temporalColumns = new Set<number>();
-    for (let col = 0; col < (cells[0]?.length ?? 0); col++) {
-      for (let row = 1; row < cells.length; row++) {
-        const val = cells[row][col];
-        if (val.startsWith('+') || (val.startsWith('-') && val.length > 1 && /^\-\d/.test(val))) {
-          deltaColumns.add(col);
-          // Detect temporal deltas (end with 's' for seconds)
-          if (val.endsWith('s')) {
-            temporalColumns.add(col);
+
+    if (deltaColumnHeader !== null) {
+      // Authoritative: the encoder recorded which columns it delta-encoded.
+      for (const col of deltaColumnHeader) deltaColumns.add(col);
+      for (const col of deltaColumns) {
+        if (cells.length > 1 && cells[1][col]?.endsWith('s')) temporalColumns.add(col);
+      }
+    } else {
+      // No @X header, so this document predates it. Fall back to inferring
+      // delta columns from a leading +/-. That inference cannot tell a delta
+      // from a literal negative number, which is the bug @X exists to remove —
+      // but for an old document the information was never recorded, so it
+      // cannot be recovered here.
+      for (let col = 0; col < (cells[0]?.length ?? 0); col++) {
+        for (let row = 1; row < cells.length; row++) {
+          const val = cells[row][col];
+          if (val.startsWith('+') || (val.startsWith('-') && val.length > 1 && /^\-\d/.test(val))) {
+            deltaColumns.add(col);
+            if (val.endsWith('s')) {
+              temporalColumns.add(col);
+            }
+            break;
           }
-          break;
         }
       }
     }
@@ -469,7 +503,9 @@ function decodeSchemaRows(
       // BigInt: intercept before type-decoding to preserve full precision
       const fieldType = schema.fieldTypes.get(i);
       if (fieldType === 'bigint') {
-        obj[field] = (raw === '' || raw === '-' || raw === 'null') ? null : BigInt(raw);
+        obj[field] = (raw === '' || raw === '-' || raw === 'null')
+          ? null
+          : BigInt(raw.endsWith('n') ? raw.slice(0, -1) : raw);
         continue;
       }
 
