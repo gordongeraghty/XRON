@@ -1,0 +1,43 @@
+name: Publish npm packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - name: Publish changed packages
+        run: |
+          publish_if_new() {
+            local dir="$1"
+            local name version
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version already on npm, skipping"
+            else
+              echo "publishing $name@$version"
+              npm publish --workspace "$dir"
+            fi
+          }
+          publish_if_new packages/format
+          publish_if_new packages/cli
+          publish_if_new packages/mcp
