@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * xron-mcp — A lightweight MCP proxy that wraps any upstream MCP server
  * and compresses JSON tool responses using XRON before they reach the LLM.

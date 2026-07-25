@@ -358,7 +358,6 @@ function stringify(value: any, options?: XronOptions): string;
 
 **Throws:**
 - `TypeError` if the value contains circular references.
-- `TypeError` if the value contains `BigInt` values.
 
 ---
 
