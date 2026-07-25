@@ -820,6 +820,4 @@ MIT -- see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center">
-  Built by <a href="https://emplireamplify.com.au">Empire Amplify</a>
-</p>
+

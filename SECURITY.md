@@ -6,9 +6,9 @@ Security fixes are applied to the latest release of each package.
 
 | Package | Current Version | Supported |
 |---------|----------------|-----------|
-| `xron-format` | 0.2.x | Yes |
-| `xron-mcp` | 0.1.x | Yes |
-| `xron-cli` | 0.1.x | Yes |
+| `xron-format` | 0.4.x | Yes |
+| `xron-mcp` | 0.2.x | Yes |
+| `xron-cli` | 0.3.x | Yes |
 | `xron-skill` | 0.1.x | Yes |
 | Older releases | — | No |
 
@@ -16,9 +16,7 @@ Security fixes are applied to the latest release of each package.
 
 If you discover a security vulnerability in XRON, please report it responsibly.
 
-**Do not open a public issue.** Instead, email security concerns to:
-
-**security@empireamplify.com.au**
+**Do not open a public issue.** Instead, please report it privately via the GitHub Security tab.
 
 ### What to Include
 
