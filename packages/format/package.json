@@ -2,7 +2,7 @@
   "name": "xron-format",
   "version": "0.4.1",
   "homepage": "https://gordongeraghty.github.io/XRON/",
-  "description": "Extensible Reduced Object Notation — lossless data serialization achieving ~80% token reduction for LLM contexts",
+  "description": "Extensible Reduced Object Notation — lossless data serialization achieving up to ~80% token reduction for LLM contexts",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
