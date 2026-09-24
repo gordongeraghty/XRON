@@ -818,6 +818,8 @@ src/
 
 MIT -- see [LICENSE](LICENSE) for details.
 
+Built by [Gordon Geraghty](https://gordongeraghty.com/work/xron).
+
 ---
 
 

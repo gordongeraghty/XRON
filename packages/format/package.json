@@ -43,7 +43,7 @@
     "gpt",
     "claude"
   ],
-  "author": "Gordon Geraghty",
+  "author": "Gordon Geraghty (https://gordongeraghty.com)",
   "license": "MIT",
   "devDependencies": {
     "tsup": "^8.0.0",
