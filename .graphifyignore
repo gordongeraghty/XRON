@@ -1,0 +1,8 @@
+*.min.js
+*.min.mjs
+*.map
+docs/assets/
+dist/
+packages/*/dist/
+site/dist/
+testsprite_tests/
